@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Awaitable, Callable, TypeVar
+from typing import TypeVar
 
 from aiogram import types
 
@@ -42,7 +43,7 @@ class AdminGate:
 admin_gate = AdminGate()
 
 
-def admin_only(handler: F) -> F:
+def admin_only(handler: F) -> F:  # noqa: UP047
     @wraps(handler)
     async def wrapper(event: types.TelegramObject, *args: object, **kwargs: object) -> None:
         user = getattr(event, "from_user", None)

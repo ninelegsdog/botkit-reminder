@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.reminder.models import Base, Reminder, ReminderRecipient, ReminderType, ReminderStatus, Subscriber, Broadcast
+from src.reminder.models import Base, ReminderType
 from src.reminder.service import ReminderService, SubscriptionService
 
 
@@ -25,7 +23,7 @@ async def session_factory(tmp_path):
 async def test_create_reminder(session_factory):
     async with session_factory() as session:
         service = ReminderService(session, None)
-        fire_at = datetime.utcnow() + timedelta(hours=1)
+        fire_at = datetime.now(UTC) + timedelta(hours=1)
         reminder = await service.create_reminder(1, ReminderType.once, "Test", fire_at=fire_at)
         assert reminder.id is not None
         assert reminder.text == "Test"

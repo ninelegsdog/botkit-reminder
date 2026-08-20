@@ -5,11 +5,13 @@ import os
 import tempfile
 
 import pytest
-import pytest_asyncio
-from aiogram.fsm.storage.memory import MemoryStorage
+
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "123:ABC")
+os.environ.setdefault("TELEGRAM_WEBHOOK_SECRET", "secret")
+os.environ.setdefault("TELEGRAM_ADMIN_IDS", "123")
+os.environ.setdefault("ADMIN_PASSWORD_HASH", "change-me")
 
 from src.core.bot_factory import AppState
-from src.core.config import Settings, settings
 
 
 @pytest.fixture(scope="session")

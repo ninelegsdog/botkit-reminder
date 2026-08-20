@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class PaymentStatus(str, Enum):
+class PaymentStatus(StrEnum):
     pending = "pending"
     succeeded = "succeeded"
     failed = "failed"
@@ -37,7 +37,14 @@ class Invoice:
 
 class MockAdapter(PaymentProvider):
     async def create_invoice(self, user_id: int, amount: int, payload: str) -> dict[str, Any]:
-        return Invoice(provider="mock", external_id=f"mock-{payload}", amount=amount, currency="XTR", payload=payload).__dict__
+        invoice = Invoice(
+            provider="mock",
+            external_id=f"mock-{payload}",
+            amount=amount,
+            currency="XTR",
+            payload=payload,
+        )
+        return invoice.__dict__
 
     async def confirm(self, payload: str) -> PaymentStatus:
         return PaymentStatus.succeeded

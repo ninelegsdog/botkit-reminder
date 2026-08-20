@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.reminder.models import Base
 from src.admin.service import AdminService
+from src.reminder.models import Base
 
 
 @pytest.fixture

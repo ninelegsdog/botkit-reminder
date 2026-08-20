@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import Dict
 
 from aiogram import types
 
-_THROTTLE: Dict[str, Dict[int, float]] = defaultdict(dict)
+_THROTTLE: dict[str, dict[int, float]] = defaultdict(dict)
 
 
 class ThrottlingMiddleware:

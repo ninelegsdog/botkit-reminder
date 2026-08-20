@@ -1,9 +1,9 @@
-FROM python:3.13-slim AS builder
+FROM python:3.12-slim AS builder
 RUN pip install uv
 COPY pyproject.toml .
 RUN uv sync --frozen --no-dev
 
-FROM python:3.13-slim
+FROM python:3.12-slim
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
 COPY --from=builder /root/.local /home/appuser/.local

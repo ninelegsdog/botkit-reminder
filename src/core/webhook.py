@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hmac
-import hashlib
-from fastapi import FastAPI, Request, HTTPException, Response
+
+from fastapi import FastAPI, HTTPException, Request, Response
 
 from src.core.config import settings
 
@@ -16,7 +16,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/metrics")
 async def metrics() -> Response:
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

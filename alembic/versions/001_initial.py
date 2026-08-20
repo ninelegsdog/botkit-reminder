@@ -4,16 +4,16 @@ Revision ID: 001
 Revises:
 Create Date: 2026-08-21 01:30:00
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+
+import sqlalchemy as sa
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import sqlite
 
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,6 +27,8 @@ def upgrade() -> None:
         sa.Column("text", sa.Text(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("status", sa.Enum("active", "done", "cancelled", name="reminderstatus"), nullable=False),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(["reminder_id"], ["reminders.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
@@ -38,6 +40,7 @@ def upgrade() -> None:
         sa.Column("status", sa.Enum("pending", "delivered", "failed", "unsubscribed", name="broadcaststatus"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("reminder_id", "user_id", name="uq_reminder_recipient"),
+        sa.ForeignKeyConstraint(["reminder_id"], ["reminders.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_reminder_recipients_user_id", "reminder_recipients", ["user_id"], unique=False)
     op.create_table(
@@ -61,6 +64,7 @@ def upgrade() -> None:
         sa.Column("delivered", sa.Integer(), nullable=False),
         sa.Column("failed", sa.Integer(), nullable=False),
         sa.Column("unsubscribed", sa.Integer(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
@@ -71,6 +75,7 @@ def upgrade() -> None:
         sa.Column("status", sa.Enum("pending", "delivered", "failed", "unsubscribed", name="broadcaststatus"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("broadcast_id", "user_id", name="uq_broadcast_recipient"),
+        sa.ForeignKeyConstraint(["broadcast_id"], ["broadcasts.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_broadcast_recipients_status", "broadcast_recipients", ["status"], unique=False)
 

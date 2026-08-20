@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+
 from aiogram.types import InlineKeyboardMarkup
 
 

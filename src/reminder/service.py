@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import math
-from datetime import datetime, timedelta
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from aiogram import Bot
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.config import settings
 from src.reminder.models import (
     Broadcast,
     BroadcastRecipient,
@@ -53,10 +51,21 @@ class ReminderService:
 
     async def get_due_reminders(self, now: datetime) -> Sequence[Reminder]:
         stmt = select(Reminder).where(
+            Reminder.type == ReminderType.once,
             Reminder.status == ReminderStatus.active,
-            Reminder.is_active == True,
+            Reminder.is_active,
             Reminder.fire_at != None,  # noqa: E711
             Reminder.fire_at <= now,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_recurring_due(self, weekday: int) -> Sequence[Reminder]:
+        stmt = select(Reminder).where(
+            Reminder.type == ReminderType.recurring,
+            Reminder.status == ReminderStatus.active,
+            Reminder.is_active,
+            Reminder.cron_day == str(weekday),
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
@@ -82,7 +91,7 @@ class ReminderService:
             try:
                 await self.bot.send_message(rr.user_id, f"⏰ {reminder.text}")
                 rr.status = BroadcastStatus.delivered
-                rr.delivered_at = datetime.utcnow()
+                rr.delivered_at = datetime.now(UTC)
             except Exception:
                 rr.status = BroadcastStatus.failed
         await self.session.flush()
@@ -125,10 +134,15 @@ class BroadcastService:
             recipient = BroadcastRecipient(broadcast_id=broadcast_id, user_id=sub.user_id)
             self.session.add(recipient)
             await self.session.flush()
+            if not sub.is_active:
+                recipient.status = BroadcastStatus.unsubscribed
+                unsubscribed += 1
+                continue
             try:
-                await self.bot.send_message(sub.user_id, broadcast.text)
+                if self.bot:
+                    await self.bot.send_message(sub.user_id, broadcast.text)
                 recipient.status = BroadcastStatus.delivered
-                recipient.delivered_at = datetime.utcnow()
+                recipient.delivered_at = datetime.now(UTC)
                 delivered += 1
             except Exception:
                 recipient.status = BroadcastStatus.failed
@@ -138,11 +152,11 @@ class BroadcastService:
         broadcast.delivered = delivered
         broadcast.failed = failed
         broadcast.unsubscribed = unsubscribed
-        broadcast.sent_at = datetime.utcnow()
+        broadcast.sent_at = datetime.now(UTC)
         await self.session.flush()
 
     async def _get_subscribers(self, segment: str) -> Sequence[Subscriber]:
-        stmt = select(Subscriber).where(Subscriber.is_active == True)
+        stmt = select(Subscriber).where(Subscriber.is_active)
         if segment == "active":
             pass
         result = await self.session.execute(stmt)

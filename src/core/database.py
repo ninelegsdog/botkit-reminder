@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -50,7 +50,8 @@ def backup_database(dest_dir: Path) -> str | None:
     if not db_file.exists():
         return None
     dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / f"{db_file.name}.{__import__('datetime').datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.backup"
+    stamp = __import__("datetime").datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = dest_dir / f"{db_file.name}.{stamp}.backup"
     try:
         import shutil
         shutil.copy2(db_file, dest)

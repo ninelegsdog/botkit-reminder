@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from prometheus_client import Counter, Gauge, generate_latest, start_http_server
 from aiogram import types
+from prometheus_client import Counter, Gauge, start_http_server
 
 MESSAGES_TOTAL = Counter("bot_messages_total", "Total messages", ["handler", "status"])
 ACTIVE_USERS = Gauge("bot_active_users", "Active users", ["period"])

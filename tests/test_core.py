@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import re
-
 import pytest
-from aiogram import Bot, Dispatcher
-from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, User, Chat
 
-from src.core.auth import AdminGate, admin_gate, verify_password, is_admin
+from src.core.auth import admin_gate, is_admin, verify_password
+from src.core.database import get_session
 from src.core.ui import escape
-from src.core.database import Base, get_session
 
 
 def test_escape_html() -> None:
@@ -30,7 +25,7 @@ def test_admin_gate() -> None:
 
 
 def test_is_admin() -> None:
-    assert is_admin(123456789) is True
+    assert is_admin(123) is True
     assert is_admin(999999999) is False
 
 

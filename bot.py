@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
-from aiogram import Dispatcher
 from fastapi import FastAPI
 
-from src.core.bot_factory import create_bot, state
+from src.core.bot_factory import state
 from src.core.config import settings
 from src.core.metrics import start_metrics
 from src.core.webhook import app as webhook_app
@@ -33,7 +32,10 @@ async def _run_polling() -> None:
 async def _run_webhook() -> None:
     _setup_dp()
     webhook_path = f"/webhook/{settings.telegram_bot_token}"
-    await state.bot.set_webhook(f"https://botkit-reminder.onrender.com{webhook_path}", secret_token=settings.telegram_webhook_secret)
+    await state.bot.set_webhook(
+        f"https://botkit-reminder.onrender.com{webhook_path}",
+        secret_token=settings.telegram_webhook_secret,
+    )
     logger.info("Webhook set to %s", webhook_path)
 
 
@@ -54,11 +56,9 @@ async def main() -> None:
     import sys
     if "--webhook" in sys.argv:
         await _run_webhook()
-        try:
-            while True:
-                await asyncio.sleep(3600)
-        except asyncio.CancelledError:
-            pass
+        stop_event = asyncio.Event()
+        with suppress(asyncio.CancelledError):
+            await stop_event.wait()
     else:
         await _run_polling()
 

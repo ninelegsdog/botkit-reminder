@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from alembic import command
-from alembic.config import Config
 from pathlib import Path
 
+from alembic.config import Config
+
+from alembic import command
 
 ALEMBIC_CFG = Path(__file__).resolve().parent.parent.parent / "alembic.ini"
 
