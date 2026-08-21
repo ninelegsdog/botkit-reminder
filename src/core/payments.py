@@ -1,25 +1,65 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+
+
+class PaymentStatus(StrEnum):
+    pending = "pending"
+    succeeded = "succeeded"
+    failed = "failed"
 
 
 class PaymentProvider(ABC):
     @abstractmethod
-    async def create_payment(
-        self, *, title: str, description: str, payload: str, amount: int, currency: str = "RUB"
-    ) -> str:
+    async def create_invoice(self, user_id: int, amount: int, payload: str) -> dict[str, Any]:
         ...
 
     @abstractmethod
-    async def check_payment(self, payment_id: str) -> bool:
+    async def confirm(self, payload: str) -> PaymentStatus:
+        ...
+
+    @abstractmethod
+    async def subscription_status(self, user_id: int) -> PaymentStatus:
         ...
 
 
-class MockPaymentProvider(PaymentProvider):
-    async def create_payment(
-        self, *, title: str, description: str, payload: str, amount: int, currency: str = "RUB"
-    ) -> str:
-        return "mock_payment_123"
+@dataclass
+class Invoice:
+    provider: str
+    external_id: str
+    amount: int
+    currency: str
+    payload: str
 
-    async def check_payment(self, payment_id: str) -> bool:
-        return True
+
+class MockAdapter(PaymentProvider):
+    async def create_invoice(self, user_id: int, amount: int, payload: str) -> dict[str, Any]:
+        invoice = Invoice(
+            provider="mock",
+            external_id=f"mock-{payload}",
+            amount=amount,
+            currency="XTR",
+            payload=payload,
+        )
+        return invoice.__dict__
+
+    async def confirm(self, payload: str) -> PaymentStatus:
+        return PaymentStatus.succeeded
+
+    async def subscription_status(self, user_id: int) -> PaymentStatus:
+        return PaymentStatus.succeeded
+
+
+_adapter: PaymentProvider = MockAdapter()
+
+
+def get_payment_provider() -> PaymentProvider:
+    return _adapter
+
+
+def set_payment_provider(provider: PaymentProvider) -> None:
+    global _adapter
+    _adapter = provider

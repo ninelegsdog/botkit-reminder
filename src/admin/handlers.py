@@ -1,64 +1,63 @@
 from __future__ import annotations
 
+import logging
+from typing import Any
+
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from src.core.bot_factory import AppState
-from src.core.fsm import AdminAuth
-from src.core.nav import admin_menu, client_menu
-from src.reminder import service
+from src.admin.service import AdminService
+from src.core.auth import admin_only
+from src.core.navigation import reply_menu
+from src.core.ui import escape
+from src.core.uow import UnitOfWork
+
+logger = logging.getLogger(__name__)
 
 
-def create_admin_router(state: AppState) -> Router:
+def create_router() -> Router:
     router = Router()
-    db = state.db
-
-    def is_admin(user_id: int) -> bool:
-        return user_id == 123456789  # TODO: real admin check
 
     @router.message(Command("admin"))
-    async def cmd_admin(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.set_state(AdminAuth.waiting_password)
-        await message.answer("🔑 Введите пароль:")
+    async def admin_entry(message: Message, state: Any) -> None:
+        await message.answer("Введите пароль:")
+        await state.set_state("admin:password")
 
-    @router.message(AdminAuth.waiting_password)
-    async def check_password(message: Message, state_fsm: FSMContext) -> None:
-        if message.text == state.config.admin_password:
-            await state_fsm.clear()
-            await message.answer("✅ Добро пожаловать!", reply_markup=admin_menu())
+    @router.message(F.state == "admin:password")
+    async def admin_password(message: Message, state: Any) -> None:
+        from src.core.auth import admin_gate, verify_password
+        if not message.from_user or not message.text:
+            return
+        if verify_password(message.text):
+            admin_gate.login(message.from_user.id)
+            await state.clear()
+            await message.answer(
+                "✅ Админ-доступ открыт",
+                reply_markup=reply_menu(
+                    "📊 Статистика",
+                    "📣 Рассылка",
+                    "👥 Подписчики",
+                ),
+            )
         else:
-            await state_fsm.clear()
-            await message.answer("❌ Неверный пароль.", reply_markup=client_menu())
+            await message.answer("❌ Неверный пароль")
 
-    @router.message(F.text == "👥 Подписчики")
-    async def list_subscribers(message: Message) -> None:
-        if not is_admin(message.from_user.id):  # type: ignore[union-attr]
-            return
-        subscribers = await service.get_active_subscribers(db)
-        if not subscribers:
-            await message.answer("Нет подписчиков.")
-            return
-        text = "👥 Подписчики:\n" + "\n".join(
-            f"• {s['user_id']} (@{s.get('username', 'N/A')})" for s in subscribers
-        )
-        await message.answer(text)
-
+    @admin_only
     @router.message(F.text == "📊 Статистика")
     async def admin_stats(message: Message) -> None:
-        if not is_admin(message.from_user.id):  # type: ignore[union-attr]
-            return
-        subscribers = await service.get_active_subscribers(db)
-        await message.answer(
-            f"📊 Статистика:\n"
-            f"  Подписчиков: {len(subscribers)}\n"
-        )
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
+            stats = await service.stats()
+        await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
 
-    @router.message(F.text == "📣 Рассылка")
-    async def start_broadcast(message: Message) -> None:
-        if not is_admin(message.from_user.id):  # type: ignore[union-attr]
-            return
-        await message.answer("📝 Введите текст рассылки:")
+    @admin_only
+    @router.message(F.text == "👥 Подписчики")
+    async def admin_subscribers(message: Message) -> None:
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
+            subs = await service.subscribers()
+        lines = [f"{s.user_id} @{escape(s.username or '-')} {escape(s.name or '')}" for s in subs[:50]]
+        await message.answer("\n".join(lines) or "Нет подписчиков")
 
     return router

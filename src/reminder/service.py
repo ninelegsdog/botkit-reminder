@@ -1,175 +1,216 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import text
+from aiogram import Bot
+from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.database import Database
+from src.core.metrics import BROADCAST_SENT
+from src.core.uow import UnitOfWork
+from src.reminder.models import (
+    Broadcast,
+    BroadcastRecipient,
+    BroadcastStatus,
+    Reminder,
+    ReminderRecipient,
+    ReminderStatus,
+    ReminderType,
+    Subscriber,
+)
+from src.reminder.repositories import BroadcastRecipientRepository, ReminderRepository, SubscriberRepository
+
+logger = logging.getLogger(__name__)
 
 
-async def subscribe(db: Database, user_id: int, username: str | None = None, name: str | None = None) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text(
-                "INSERT OR REPLACE INTO subscribers (user_id, username, name, is_active, subscribed_at) "
-                "VALUES (:uid, :uname, :name, 1, datetime('now'))"
-            ),
-            {"uid": user_id, "uname": username, "name": name},
+class ReminderService:
+    def __init__(self, uow: UnitOfWork, bot: Bot | None = None) -> None:
+        self._uow = uow
+        self.bot = bot
+        self._reminders = ReminderRepository(uow)
+        self._subscribers = SubscriberRepository(uow)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
+
+    async def create_reminder(
+        self,
+        creator_id: int,
+        type: ReminderType,
+        text: str,
+        fire_at: datetime | None = None,
+        cron_day: str | None = None,
+    ) -> Reminder:
+        reminder = Reminder(
+            creator_id=creator_id,
+            type=type,
+            fire_at=fire_at,
+            cron_day=cron_day,
+            text=text,
         )
+        self.session.add(reminder)
+        await self.session.flush()
+        return reminder
 
+    async def add_recipient(self, reminder_id: int, user_id: int) -> ReminderRecipient:
+        rr = ReminderRecipient(reminder_id=reminder_id, user_id=user_id)
+        self.session.add(rr)
+        await self.session.flush()
+        return rr
 
-async def unsubscribe(db: Database, user_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text("UPDATE subscribers SET is_active = 0 WHERE user_id = :uid"),
-            {"uid": user_id},
+    async def get_due_reminders(self, now: datetime) -> Sequence[Reminder]:
+        return await self._reminders.get_due_once(now)
+
+    async def get_recurring_due(self, weekday: int) -> Sequence[Reminder]:
+        return await self._reminders.get_recurring_by_weekday(weekday)
+
+    async def mark_done(self, reminder_id: int) -> None:
+        await self._reminders.mark_done(reminder_id)
+
+    async def cancel_reminder(self, reminder_id: int) -> None:
+        reminder = await self._reminders.get_by_id(reminder_id)
+        if reminder:
+            reminder.status = ReminderStatus.cancelled
+            reminder.is_active = False
+
+    async def send_reminder(self, reminder: Reminder) -> None:
+        if not self.bot:
+            return
+        recipients = await self._get_recipients(reminder.id)
+        for rr in recipients:
+            try:
+                await self.bot.send_message(rr.user_id, f"⏰ {reminder.text}")
+                rr.status = BroadcastStatus.delivered
+                rr.delivered_at = datetime.now(UTC)
+            except Exception:
+                rr.status = BroadcastStatus.failed
+        await self.session.flush()
+
+    async def _get_recipients(self, reminder_id: int) -> Sequence[ReminderRecipient]:
+        stmt = select(ReminderRecipient).where(
+            ReminderRecipient.reminder_id == reminder_id,
+            ReminderRecipient.status == BroadcastStatus.pending,
         )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_user_reminders(self, creator_id: int) -> Sequence[Reminder]:
+        return await self._reminders.get_by_creator(creator_id)
+
+    async def get_subscriber(self, user_id: int) -> Subscriber | None:
+        return await self._subscribers.get_by_user_id(user_id)
 
 
-async def get_active_subscribers(db: Database) -> list[dict[str, Any]]:
-    async with db.session() as session:
-        result = await session.execute(
-            text("SELECT * FROM subscribers WHERE is_active = 1")
-        )
-        return [dict(r) for r in result.mappings().all()]
+class BroadcastService:
+    def __init__(self, uow: UnitOfWork, bot: Bot | None = None) -> None:
+        self._uow = uow
+        self.bot = bot
+        self._recipients = BroadcastRecipientRepository(uow)
+        self._subscribers = SubscriberRepository(uow)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
+
+    async def create_broadcast(self, text: str, segment: str) -> Broadcast:
+        broadcast = Broadcast(text=text, segment=segment)
+        self.session.add(broadcast)
+        await self.session.flush()
+        return broadcast
+
+    async def send_broadcast(self, broadcast_id: int) -> None:
+        stmt = select(Broadcast).where(Broadcast.id == broadcast_id)
+        result = await self.session.execute(stmt)
+        broadcast = result.scalar_one_or_none()
+        if not broadcast:
+            return
+
+        subscribers = await self._subscribers.get_active(broadcast.segment)
+        total = 0
+        delivered = 0
+        failed = 0
+        unsubscribed = 0
+
+        for sub in subscribers:
+            total += 1
+            recipient = BroadcastRecipient(broadcast_id=broadcast_id, user_id=sub.user_id)
+            self.session.add(recipient)
+            await self.session.flush()
+            if not sub.is_active:
+                recipient.status = BroadcastStatus.unsubscribed
+                unsubscribed += 1
+                continue
+            try:
+                if self.bot:
+                    await self._send_with_retry(self.bot, sub.user_id, broadcast.text)
+                recipient.status = BroadcastStatus.delivered
+                recipient.delivered_at = datetime.now(UTC)
+                delivered += 1
+                BROADCAST_SENT.labels(status="delivered").inc()
+            except Exception:
+                recipient.status = BroadcastStatus.failed
+                failed += 1
+                BROADCAST_SENT.labels(status="failed").inc()
+
+        broadcast.total = total
+        broadcast.delivered = delivered
+        broadcast.failed = failed
+        broadcast.unsubscribed = unsubscribed
+        broadcast.sent_at = datetime.now(UTC)
+        await self.session.flush()
+
+    async def _send_with_retry(self, bot: Any, user_id: int, text: str, max_retries: int = 3) -> None:
+        import asyncio
+
+        for attempt in range(max_retries):
+            try:
+                await bot.send_message(user_id, text)
+                return
+            except TelegramRetryAfter as exc:
+                logger.warning("Flood control for user %s, retry in %s sec", user_id, exc.retry_after)
+                await asyncio.sleep(exc.retry_after)
+            except TelegramNetworkError as exc:
+                logger.warning("Network error for user %s, attempt %s: %s", user_id, attempt + 1, exc)
+                await asyncio.sleep(2 ** attempt)
+        raise RuntimeError(f"Failed to send broadcast to user {user_id} after {max_retries} retries")
 
 
-async def create_reminder(
-    db: Database,
-    *,
-    creator_id: int,
-    reminder_type: str,
-    fire_at: str,
-    text_content: str,
-    cron_day: int | None = None,
-) -> int:
-    async with db.transaction() as session:
-        result = await session.execute(
-            text(
-                "INSERT INTO reminders (type, fire_at, cron_day, text, creator_id) "
-                "VALUES (:type, :fire_at, :cron_day, :text, :creator_id)"
-            ),
-            {
-                "type": reminder_type,
-                "fire_at": fire_at,
-                "cron_day": cron_day,
-                "text": text_content,
-                "creator_id": creator_id,
-            },
-        )
-        rem_id = result.lastrowid  # type: ignore[attr-defined]
-        assert rem_id is not None
-        return int(rem_id)
+class SubscriptionService:
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+        self._subscribers = SubscriberRepository(uow)
 
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
 
-async def get_user_reminders(db: Database, user_id: int) -> list[dict[str, Any]]:
-    async with db.session() as session:
-        result = await session.execute(
-            text(
-                "SELECT * FROM reminders WHERE creator_id = :uid AND is_active = 1"
-            ),
-            {"uid": user_id},
-        )
-        return [dict(r) for r in result.mappings().all()]
+    async def subscribe(self, user_id: int, username: str | None, name: str | None) -> Subscriber:
+        stmt = select(Subscriber).where(Subscriber.user_id == user_id)
+        result = await self.session.execute(stmt)
+        sub = result.scalar_one_or_none()
+        if sub:
+            sub.is_active = True
+            sub.username = username
+            sub.name = name
+        else:
+            sub = Subscriber(user_id=user_id, username=username, name=name)
+            self.session.add(sub)
+        await self.session.flush()
+        return sub
 
+    async def unsubscribe(self, user_id: int) -> None:
+        stmt = select(Subscriber).where(Subscriber.user_id == user_id)
+        result = await self.session.execute(stmt)
+        sub = result.scalar_one_or_none()
+        if sub:
+            sub.is_active = False
 
-async def cancel_reminder(db: Database, reminder_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text("UPDATE reminders SET is_active = 0 WHERE id = :rid"),
-            {"rid": reminder_id},
-        )
-
-
-async def get_due_reminders(db: Database) -> list[dict[str, Any]]:
-    async with db.session() as session:
-        result = await session.execute(
-            text(
-                "SELECT * FROM reminders WHERE fire_at <= datetime('now') AND is_active = 1"
-            )
-        )
-        return [dict(r) for r in result.mappings().all()]
-
-
-async def mark_reminder_done(db: Database, reminder_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text("UPDATE reminders SET is_active = 0 WHERE id = :rid"),
-            {"rid": reminder_id},
-        )
-
-
-async def add_reminder_recipient(db: Database, reminder_id: int, user_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text(
-                "INSERT INTO reminder_recipients (reminder_id, user_id) VALUES (:rid, :uid)"
-            ),
-            {"rid": reminder_id, "uid": user_id},
-        )
-
-
-async def mark_recipient_delivered(db: Database, reminder_id: int, user_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text(
-                "UPDATE reminder_recipients SET status = 'delivered', delivered_at = datetime('now') "
-                "WHERE reminder_id = :rid AND user_id = :uid"
-            ),
-            {"rid": reminder_id, "uid": user_id},
-        )
-
-
-async def create_broadcast(db: Database, *, text_content: str, segment: str) -> int:
-    async with db.transaction() as session:
-        result = await session.execute(
-            text(
-                "INSERT INTO broadcasts (text, segment) VALUES (:text, :seg)"
-            ),
-            {"text": text_content, "seg": segment},
-        )
-        bc_id = result.lastrowid  # type: ignore[attr-defined]
-        assert bc_id is not None
-        return int(bc_id)
-
-
-async def add_broadcast_recipient(db: Database, broadcast_id: int, user_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text(
-                "INSERT INTO broadcast_recipients (broadcast_id, user_id) VALUES (:bid, :uid)"
-            ),
-            {"bid": broadcast_id, "uid": user_id},
-        )
-
-
-async def mark_broadcast_delivered(db: Database, broadcast_id: int, user_id: int) -> None:
-    async with db.transaction() as session:
-        await session.execute(
-            text(
-                "UPDATE broadcast_recipients SET status = 'delivered' "
-                "WHERE broadcast_id = :bid AND user_id = :uid"
-            ),
-            {"bid": broadcast_id, "uid": user_id},
-        )
-
-
-async def get_broadcast_stats(db: Database, broadcast_id: int) -> dict[str, int]:
-    async with db.session() as session:
-        result = await session.execute(
-            text(
-                "SELECT status, COUNT(*) as cnt FROM broadcast_recipients "
-                "WHERE broadcast_id = :bid GROUP BY status"
-            ),
-            {"bid": broadcast_id},
-        )
-        rows = result.mappings().all()
-        return {r["status"]: r["cnt"] for r in rows}
-
-
-async def get_broadcasts(db: Database) -> list[dict[str, Any]]:
-    async with db.session() as session:
-        result = await session.execute(
-            text("SELECT * FROM broadcasts ORDER BY sent_at DESC LIMIT 10")
-        )
-        return [dict(r) for r in result.mappings().all()]
+    async def get_subscriber(self, user_id: int) -> Subscriber | None:
+        stmt = select(Subscriber).where(Subscriber.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

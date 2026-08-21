@@ -1,39 +1,67 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "botkit-reminder"
-version = "1.0.0"
-description = "Telegram reminder bot — personal and broadcast reminders"
+version = "0.1.0"
+description = "Telegram bot for reminders and newsletters"
+readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "ninelegsdog", email = "algtro@users.noreply.github.com"},
+]
 dependencies = [
-    "aiogram>=3.15,<4",
+    "aiogram>=3.30",
     "aiosqlite>=0.20",
     "sqlalchemy[asyncio]>=2.0",
-    "alembic>=1.14",
+    "alembic>=1.13",
     "redis>=5.0",
-    "httpx>=0.28",
+    "aiohttp>=3.9",
     "pydantic-settings>=2.0",
-    "structlog>=24.0",
+    "apscheduler>=3.10",
+    "prometheus-client>=0.20",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.8", "mypy>=1.13", "pytest>=8", "pytest-cov>=6", "pytest-asyncio>=0.25"]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5",
+    "hypothesis>=6.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "fastapi>=0.100",
+    "structlog>=24.0",
+]
+
+[project.scripts]
+bot = "botkit_reminder.bot:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=50 -m 'not integration'"
+filterwarnings = ["error::DeprecationWarning"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+exclude = ["alembic/*"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "A", "SIM"]
-ignore = ["SIM105"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 
 [tool.mypy]
-python_version = "3.12"
 strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-addopts = "--strict-markers -q --tb=short"
-testpaths = ["tests"]
+[[tool.mypy.overrides]]
+module = "aiogram.*"
+ignore_errors = true
+
+[tool.hypothesis]
+database = ".hypothesis/examples.db"
+print_blob = true

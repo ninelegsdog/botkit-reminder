@@ -7,11 +7,13 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 
 from src.core.bot_factory import state
+from src.core.commands import set_commands
 from src.core.config import settings
 from src.core.errors import register_error_handler
 from src.core.logging import configure_logging
 from src.core.metrics import start_metrics
 from src.core.webhook import app as webhook_app
+from src.core.webhook import set_webhook_dispatcher
 from src.reminder import register_routers
 from src.reminder.scheduler import Scheduler
 
@@ -24,17 +26,20 @@ def _setup_dp() -> None:
     state.dp.message.middleware(ThrottlingMiddleware())
     register_error_handler(state.dp)
     register_routers(state)
+    set_webhook_dispatcher(state.dp)
 
 
 async def _run_polling() -> None:
     _setup_dp()
     await state.bot.delete_webhook(drop_pending_updates=True)
+    await set_commands(state.bot)
     logger.info("Starting polling")
     await state.dp.start_polling(state.bot)
 
 
 async def _run_webhook() -> None:
     _setup_dp()
+    await set_commands(state.bot)
     webhook_path = f"/webhook/{settings.telegram_bot_token}"
     await state.bot.set_webhook(
         f"https://botkit-reminder.onrender.com{webhook_path}",

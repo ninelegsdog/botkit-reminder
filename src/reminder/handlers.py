@@ -1,226 +1,297 @@
 from __future__ import annotations
 
+import logging
+from datetime import datetime
+
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.core.bot_factory import AppState
-from src.core.fsm import ReminderOnce, ReminderRecurring
-from src.core.nav import client_menu
-from src.core.ui import escape, reminder_card
-from src.reminder import service
+from src.core.auth import admin_only
+from src.core.navigation import compose_message, nav_header, reply_menu
+from src.core.ui import escape
+from src.core.uow import UnitOfWork
+from src.reminder.models import ReminderType
+from src.reminder.service import BroadcastService, ReminderService, SubscriptionService
+
+logger = logging.getLogger(__name__)
 
 
-def create_reminder_router(state: AppState) -> Router:
+def _delete_button(reminder_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.add(InlineKeyboardButton(text="🗑 Удалить", callback_data=f"rem:confirm:delete:{reminder_id}"))
+    kb.add(InlineKeyboardButton(text="❌ Отмена", callback_data="rem:cancel"))
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def create_router() -> Router:
     router = Router()
-    db = state.db
 
-    @router.message(Command("start"))
+    @router.message(CommandStart())
     async def cmd_start(message: Message) -> None:
-        await service.subscribe(
-            db,
-            message.from_user.id,  # type: ignore[union-attr]
-            getattr(message.from_user, "username", None),
-            getattr(message.from_user, "first_name", None),
+        text = compose_message(
+            nav_header("ReminderBot"),
+            "Подпишитесь на напоминания и рассылки. Или начните с кнопки ниже.",
         )
         await message.answer(
-            "⏰ Подпишитесь на напоминания!",
-            reply_markup=client_menu(),
+            text,
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+                "🔔 Подписаться",
+                "🔕 Отписаться",
+            ),
+        )
+
+    @router.message(F.text == "🔔 Подписаться")
+    async def subscribe(message: Message) -> None:
+        if not message.from_user:
+            return
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
+            await service.subscribe(message.from_user.id, message.from_user.username, message.from_user.full_name)
+        await message.answer(
+            "✅ Вы подписаны на рассылки",
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+                "🔕 Отписаться",
+            ),
+        )
+
+    @router.message(F.text == "🔕 Отписаться")
+    async def unsubscribe(message: Message) -> None:
+        if not message.from_user:
+            return
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
+            await service.unsubscribe(message.from_user.id)
+        await message.answer(
+            "✅ Вы отписались от рассылок",
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+                "🔔 Подписаться",
+            ),
         )
 
     @router.message(F.text == "➕ Добавить")
-    async def start_add(message: Message) -> None:
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="🔸 Одноразовое", callback_data="rem_type:once")],
-                [InlineKeyboardButton(text="🔁 Повторяющееся", callback_data="rem_type:recurring")],
-            ]
-        )
-        await message.answer("Выберите тип:", reply_markup=kb)
+    async def add_reminder_start(message: Message, state: FSMContext) -> None:
+        kb = InlineKeyboardBuilder()
+        kb.add(InlineKeyboardButton(text="🔸 Одноразовое", callback_data="rem:type:once"))
+        kb.add(InlineKeyboardButton(text="🔁 Повторяющееся", callback_data="rem:type:recurring"))
+        kb.adjust(2)
+        await message.answer("Выберите тип напоминания:", reply_markup=kb.as_markup())
 
-    @router.callback_query(F.data == "rem_type:once")
-    async def choose_once(callback: CallbackQuery, state_fsm: FSMContext) -> None:
-        await state_fsm.set_state(ReminderOnce.entering_date)
-        await callback.message.edit_text("📅 Дата (ДД.ММ.ГГГГ):")  # type: ignore[union-attr]
-        await callback.answer()
+    @router.callback_query(F.data == "rem:type:once")
+    async def once_type(callback: CallbackQuery, state: FSMContext) -> None:
+        await state.update_data(type=ReminderType.once.value)
+        if callback.message:
+            await callback.message.edit_text("Введите дату в формате ДД.ММ.ГГГГ")  # type: ignore[union-attr]
+        await state.set_state("reminder:date")
 
-    @router.message(ReminderOnce.entering_date)
-    async def enter_date(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.update_data(date=message.text or "")
-        await state_fsm.set_state(ReminderOnce.entering_time)
-        await message.answer("⏰ Время (ЧЧ:ММ):")
-
-    @router.message(ReminderOnce.entering_time)
-    async def enter_time(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.update_data(time=message.text or "")
-        await state_fsm.set_state(ReminderOnce.entering_text)
-        await message.answer("📝 Текст напоминания:")
-
-    @router.message(ReminderOnce.entering_text)
-    async def enter_text_once(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.update_data(text=message.text or "")
-        data = await state_fsm.get_data()
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="✅ Создать", callback_data="rem_once_confirm"),
-                    InlineKeyboardButton(text="❌ Отмена", callback_data="rem_cancel"),
-                ]
-            ]
-        )
-        await state_fsm.set_state(ReminderOnce.confirming)
-        await message.answer(
-            f"Создать напоминание?\n"
-            f"📅 {escape(str(data.get('date', '')))} ⏰ {escape(str(data.get('time', '')))}\n"
-            f"📝 {escape(str(data.get('text', '')))}",
-            reply_markup=kb,
-        )
-
-    @router.callback_query(F.data == "rem_type:recurring")
-    async def choose_recurring(callback: CallbackQuery, state_fsm: FSMContext) -> None:
+    @router.callback_query(F.data == "rem:type:recurring")
+    async def recurring_type(callback: CallbackQuery, state: FSMContext) -> None:
+        await state.update_data(type=ReminderType.recurring.value)
         days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=d, callback_data=f"rem_day:{i}")]
-                for i, d in enumerate(days)
-            ]
-        )
-        await callback.message.edit_text("📅 День недели:", reply_markup=kb)  # type: ignore[union-attr]
-        await callback.answer()
+        kb = InlineKeyboardBuilder()
+        for i, d in enumerate(days):
+            kb.add(InlineKeyboardButton(text=d, callback_data=f"rem:day:{i}"))
+        kb.adjust(4)
+        if callback.message:
+            await callback.message.edit_text("Выберите день недели:", reply_markup=kb.as_markup())  # type: ignore[union-attr]
 
-    @router.callback_query(F.data.startswith("rem_day:"))
-    async def choose_day(callback: CallbackQuery, state_fsm: FSMContext) -> None:
-        if not callback.data:
+    @router.callback_query(F.data.startswith("rem:day:"))
+    async def day_selected(callback: CallbackQuery, state: FSMContext) -> None:
+        day = callback.data.split(":")[-1]  # type: ignore[union-attr]
+        await state.update_data(cron_day=day)
+        if callback.message:
+            await callback.message.edit_text("Введите время ЧЧ:ММ")  # type: ignore[union-attr]
+        await state.set_state("reminder:time")
+
+    @router.message(F.state == "reminder:date")
+    async def date_entered(message: Message, state: FSMContext) -> None:
+        if not message.text:
             return
-        day = int(callback.data.split(":")[1])
-        await state_fsm.update_data(cron_day=day)
-        await state_fsm.set_state(ReminderRecurring.entering_time)
-        await callback.message.edit_text("⏰ Время (ЧЧ:ММ):")  # type: ignore[union-attr]
-        await callback.answer()
+        try:
+            fire_at = datetime.strptime(message.text.strip(), "%d.%m.%Y")
+        except ValueError:
+            await message.answer("Неверный формат. Введите ДД.ММ.ГГГГ")
+            return
+        await state.update_data(fire_at=fire_at.date().isoformat())
+        await message.answer("Введите время ЧЧ:ММ")
+        await state.set_state("reminder:time")
 
-    @router.message(ReminderRecurring.entering_time)
-    async def enter_time_recurring(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.update_data(time=message.text or "")
-        await state_fsm.set_state(ReminderRecurring.entering_text)
-        await message.answer("📝 Текст напоминания:")
-
-    @router.message(ReminderRecurring.entering_text)
-    async def enter_text_recurring(message: Message, state_fsm: FSMContext) -> None:
-        await state_fsm.update_data(text=message.text or "")
-        data = await state_fsm.get_data()
-        days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-        day_name = days[int(str(data.get("cron_day", 0)))]
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="✅ Создать", callback_data="rem_rec_confirm"),
-                    InlineKeyboardButton(text="❌ Отмена", callback_data="rem_cancel"),
-                ]
-            ]
-        )
-        await state_fsm.set_state(ReminderRecurring.confirming)
+    @router.message(F.state == "reminder:time")
+    async def time_entered(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
+        try:
+            h, m = map(int, message.text.strip().split(":"))
+        except Exception:
+            await message.answer("Неверный формат. Введите ЧЧ:ММ")
+            return
+        data = await state.get_data()
+        fire_at_str = data.get("fire_at")
+        if fire_at_str:
+            fire_at = datetime.fromisoformat(fire_at_str).replace(hour=h, minute=m)
+        else:
+            await message.answer("Сначала выберите тип и параметры")
+            await state.clear()
+            return
+        text = data.get("text") or message.text
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
+            reminder = await service.create_reminder(
+                creator_id=message.from_user.id if message.from_user else 0,
+                type=ReminderType(data["type"]),
+                text=text or "Напоминание",
+                fire_at=fire_at,
+                cron_day=data.get("cron_day"),
+            )
+        await state.clear()
         await message.answer(
-            f"Создать повторяющееся?\n"
-            f"📅 {day_name} ⏰ {escape(str(data.get('time', '')))}\n"
-            f"📝 {escape(str(data.get('text', '')))}",
-            reply_markup=kb,
+            f"✅ Напоминание создано! ID: {reminder.id}",
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+            ),
         )
-
-    @router.callback_query(F.data == "rem_once_confirm", ReminderOnce.confirming)
-    async def confirm_once(callback: CallbackQuery, state_fsm: FSMContext) -> None:
-        data = await state_fsm.get_data()
-        fire_at = f"{data.get('date', '')} {data.get('time', '')}:00"
-        await service.create_reminder(
-            db,
-            creator_id=callback.from_user.id,
-            reminder_type="once",
-            fire_at=fire_at,
-            text_content=str(data.get("text", "")),
-        )
-        await state_fsm.clear()
-        await callback.message.edit_text("✅ Напоминание создано!")  # type: ignore[union-attr]
-        await callback.answer()
-        await callback.message.answer("Выберите действие:", reply_markup=client_menu())  # type: ignore[union-attr]
-
-    @router.callback_query(F.data == "rem_rec_confirm", ReminderRecurring.confirming)
-    async def confirm_recurring(callback: CallbackQuery, state_fsm: FSMContext) -> None:
-        data = await state_fsm.get_data()
-        fire_at = "09:00:00"
-        await service.create_reminder(
-            db,
-            creator_id=callback.from_user.id,
-            reminder_type="recurring",
-            fire_at=fire_at,
-            text_content=str(data.get("text", "")),
-            cron_day=int(str(data.get("cron_day", 0))),
-        )
-        await state_fsm.clear()
-        await callback.message.edit_text("✅ Повторяющееся напоминание создано!")  # type: ignore[union-attr]
-        await callback.answer()
-        await callback.message.answer("Выберите действие:", reply_markup=client_menu())  # type: ignore[union-attr]
-
-    @router.callback_query(F.data == "rem_cancel")
-    async def cancel_reminder(callback: CallbackQuery, state_fsm: FSMContext) -> None:
-        await state_fsm.clear()
-        await callback.message.edit_text("Отменено.")  # type: ignore[union-attr]
-        await callback.answer()
-        await callback.message.answer("Выберите действие:", reply_markup=client_menu())  # type: ignore[union-attr]
 
     @router.message(F.text == "⏰ Мои напоминания")
     async def my_reminders(message: Message) -> None:
-        reminders = await service.get_user_reminders(db, message.from_user.id)  # type: ignore[union-attr]
+        if not message.from_user:
+            return
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
+            reminders = await service.get_user_reminders(message.from_user.id)
         if not reminders:
-            await message.answer("Нет напоминаний.")
-            return
-        for r in reminders:
-            card = reminder_card(r)
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="❌ Удалить", callback_data=f"rem_del:{r['id']}")]
-                ]
+            await message.answer(
+                "Нет напоминаний",
+                reply_markup=reply_menu("➕ Добавить", "📣 Рассылки"),
             )
-            await message.answer(card, reply_markup=kb)
-
-    @router.callback_query(F.data.startswith("rem_del:"))
-    async def delete_reminder(callback: CallbackQuery) -> None:
-        if not callback.data:
             return
-        rem_id = int(callback.data.split(":")[1])
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="✅ Да", callback_data=f"rem_del_yes:{rem_id}"),
-                    InlineKeyboardButton(text="❌ Нет", callback_data="rem_del_no"),
-                ]
-            ]
+        lines = []
+        for r in reminders:
+            when = r.fire_at.strftime("%d.%m.%Y %H:%M") if r.fire_at else r.cron_day or "?"
+            lines.append(f"#{r.id} {r.type.value} {when} — {escape(r.text)}")
+        await message.answer(
+            "\n".join(lines),
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+            ),
         )
-        await callback.message.edit_text("❓ Удалить напоминание?", reply_markup=kb)  # type: ignore[union-attr]
-        await callback.answer()
 
-    @router.callback_query(F.data.startswith("rem_del_yes:"))
-    async def confirm_delete(callback: CallbackQuery) -> None:
+    @router.callback_query(F.data.startswith("rem:delete:"))
+    async def delete_reminder_prompt(callback: CallbackQuery) -> None:
         if not callback.data:
             return
-        rem_id = int(callback.data.split(":")[1])
-        await service.cancel_reminder(db, rem_id)
-        await callback.message.edit_text("✅ Напоминание удалено.")  # type: ignore[union-attr]
+        reminder_id = int(callback.data.split(":")[-1])
+        if callback.message:
+            await callback.message.edit_text("❓ Удалить это напоминание?", reply_markup=_delete_button(reminder_id))  # type: ignore[union-attr]
+
+    @router.callback_query(F.data.startswith("rem:confirm:delete:"))
+    async def delete_reminder_confirm(callback: CallbackQuery) -> None:
+        if not callback.data:
+            return
+        reminder_id = int(callback.data.split(":")[-1])
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
+            await service.cancel_reminder(reminder_id)
+        if callback.message:
+            await callback.message.edit_text("✅ Напоминание удалено")  # type: ignore[union-attr]
         await callback.answer()
 
-    @router.callback_query(F.data == "rem_del_no")
-    async def cancel_delete(callback: CallbackQuery) -> None:
-        await callback.message.edit_text("Оставлено.")  # type: ignore[union-attr]
+    @router.callback_query(F.data == "rem:cancel")
+    async def delete_cancel(callback: CallbackQuery) -> None:
+        if callback.message:
+            await callback.message.edit_text("❌ Отменено")  # type: ignore[union-attr]
         await callback.answer()
 
     @router.message(F.text == "📣 Рассылки")
-    async def show_broadcasts(message: Message) -> None:
-        broadcasts = await service.get_broadcasts(db)
-        if not broadcasts:
-            await message.answer("Рассылок не было.")
+    async def broadcasts(message: Message, state: FSMContext) -> None:
+        if not message.from_user:
             return
-        from src.core.ui import broadcast_card
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
+            sub = await service.get_subscriber(message.from_user.id)
+            if not sub or not sub.is_active:
+                await message.answer(
+                    "🔕 Вы не подписаны на рассылки. Подпишитесь сначала.",
+                    reply_markup=reply_menu("🔔 Подписаться", "⏰ Мои напоминания"),
+                )
+                return
+        await message.answer("Введите текст рассылки:")
+        await state.set_state("broadcast.text")
 
-        for bc in broadcasts[:5]:
-            await message.answer(broadcast_card(bc))
+    @router.message(F.state == "broadcast.text")
+    async def broadcast_text(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
+        async with UnitOfWork() as uow:
+            service = BroadcastService(uow)
+            broadcast = await service.create_broadcast(message.text, segment="active")
+            await service.send_broadcast(broadcast.id)
+        await state.clear()
+        await message.answer(
+            f"✅ Рассылка отправлена! ID: {broadcast.id}",
+            reply_markup=reply_menu(
+                "⏰ Мои напоминания",
+                "📣 Рассылки",
+                "➕ Добавить",
+            ),
+        )
+
+    @router.message(Command("admin"))
+    async def admin_entry(message: Message, state: FSMContext) -> None:
+        await message.answer("Введите пароль:")
+        await state.set_state("admin:password")
+
+    @router.message(F.state == "admin:password")
+    async def admin_password(message: Message, state: FSMContext) -> None:
+        from src.core.auth import admin_gate, verify_password
+        if not message.from_user or not message.text:
+            return
+        if verify_password(message.text):
+            admin_gate.login(message.from_user.id)
+            await state.clear()
+            await message.answer(
+                "✅ Админ-доступ открыт",
+                reply_markup=reply_menu(
+                    "📊 Статистика",
+                    "📣 Рассылка",
+                    "👥 Подписчики",
+                ),
+            )
+        else:
+            await message.answer("❌ Неверный пароль")
+
+    @admin_only
+    @router.message(F.text == "📊 Статистика")
+    async def admin_stats(message: Message) -> None:
+        from src.admin.service import AdminService
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
+            stats = await service.stats()
+        await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
+
+    @admin_only
+    @router.message(F.text == "👥 Подписчики")
+    async def admin_subscribers(message: Message) -> None:
+        from src.admin.service import AdminService
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
+            subs = await service.subscribers()
+        lines = [f"{s.user_id} @{escape(s.username or '-')} {escape(s.name or '')}" for s in subs[:50]]
+        await message.answer("\n".join(lines) or "Нет подписчиков")
 
     return router

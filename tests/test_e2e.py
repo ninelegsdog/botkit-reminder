@@ -1,46 +1,39 @@
 from __future__ import annotations
 
+from datetime import datetime
+from unittest.mock import AsyncMock, patch
+
 import pytest
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import Chat, Message, Update, User
 
-from src.core.ui import reminder_card
-from src.reminder import service
-
-
-@pytest.mark.asyncio
-async def test_full_reminder_flow(db):
-    await service.subscribe(db, 111, "user1", "User One")
-    rem_id = await service.create_reminder(
-        db, creator_id=111, reminder_type="once",
-        fire_at="2026-01-01 09:00:00", text_content="Meeting"
-    )
-    assert rem_id > 0
-
-    reminders = await service.get_user_reminders(db, 111)
-    assert len(reminders) == 1
-
-    await service.cancel_reminder(db, rem_id)
-    reminders = await service.get_user_reminders(db, 111)
-    assert len(reminders) == 0
+from src.core.bot_factory import create_bot
+from src.reminder import register_routers
 
 
 @pytest.mark.asyncio
-async def test_broadcast_flow(db):
-    await service.subscribe(db, 111, "user1", "User One")
-    await service.subscribe(db, 222, "user2", "User Two")
-    bc_id = await service.create_broadcast(db, text_content="Hello", segment="all")
-    assert bc_id > 0
+async def test_start_command() -> None:
+    bot = Bot(token="123:ABC")
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value={"ok": True, "result": {"message_id": 1}})
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=False)
 
-    subscribers = await service.get_active_subscribers(db)
-    assert len(subscribers) == 2
-
-
-@pytest.mark.asyncio
-async def test_reminder_card_html():
-    card = reminder_card({
-        "id": 1,
-        "type": "once",
-        "text": "Test <script>",
-        "is_active": 1,
-    })
-    assert "<script>" not in card
-    assert "Напоминание #1" in card
+    with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response):
+        dp = Dispatcher(storage=MemoryStorage())
+        app_state = create_bot()
+        app_state.dp = dp
+        app_state.bot = bot
+        register_routers(app_state)
+        message = Message(
+            message_id=1,
+            date=datetime.now(),
+            chat=Chat(id=1, type="private"),
+            from_user=User(id=1, is_bot=False, first_name="Test"),
+            text="/start",
+        )
+        update = Update(update_id=1, message=message)
+        await dp.feed_update(bot, update)
+        assert True

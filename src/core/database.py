@@ -1,33 +1,61 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import sqlite3
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
-from src.core.config import Config
+from src.core.config import settings
 
 
-class Database:
-    def __init__(self, config: Config) -> None:
-        self._engine = create_async_engine(
-            f"sqlite+aiosqlite:///{config.db_path}",
-            echo=False,
-        )
-        self._session_factory = sessionmaker(  # type: ignore[call-overload]
-            self._engine, class_=AsyncSession, expire_on_commit=False
-        )
+class Base(DeclarativeBase):
+    pass
 
-    @asynccontextmanager
-    async def session(self) -> AsyncIterator[AsyncSession]:
-        async with self._session_factory() as session:
+
+db_path = Path(settings.database_url.replace("sqlite+aiosqlite:///", ""))
+db_path.parent.mkdir(parents=True, exist_ok=True)
+
+engine = create_async_engine(settings.database_url, echo=False)
+async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+
+@asynccontextmanager
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session() as session:
+        try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
-    @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[AsyncSession]:
-        async with self._session_factory() as session, session.begin():
-            yield session
 
-    async def close(self) -> None:
-        await self._engine.dispose()
+def ensure_wal(db_file: Path) -> None:
+    if db_file.suffix not in (".db", ".sqlite"):
+        return
+    try:
+        conn = sqlite3.connect(db_file)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.close()
+    except Exception:
+        pass
+
+
+def backup_database(dest_dir: Path) -> str | None:
+    db_file = Path(settings.database_url.replace("sqlite+aiosqlite:///", ""))
+    if not db_file.exists():
+        return None
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    stamp = __import__("datetime").datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = dest_dir / f"{db_file.name}.{stamp}.backup"
+    try:
+        import shutil
+        shutil.copy2(db_file, dest)
+        ensure_wal(dest)
+        return str(dest)
+    except Exception:
+        return None
