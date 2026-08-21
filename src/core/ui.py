@@ -1,23 +1,29 @@
 from __future__ import annotations
 
 import html
-
-from aiogram.types import InlineKeyboardMarkup, Message
-
-
-def escape(text: str) -> str:
-    return html.escape(text)
+from typing import Any
 
 
-def truncate(text: str, limit: int = 4096) -> str:
-    if len(text) <= limit:
-        return text
-    return text[: limit - 3] + "..."
+def escape(text: str | None) -> str:
+    return html.escape(str(text)) if text else ""
 
 
-async def safe_edit_text(message: Message, text: str, reply_markup: InlineKeyboardMarkup | None = None) -> None:
-    safe = truncate(text)
-    if reply_markup is None:
-        await message.edit_text(safe)
-    else:
-        await message.edit_text(safe, reply_markup=reply_markup)
+def reminder_card(reminder: dict[str, Any]) -> str:
+    rtype = str(reminder.get("type", "once"))
+    type_label = "🔸 Одноразовое" if rtype == "once" else "🔁 Повторяющееся"
+    status = str(reminder.get("is_active", 1))
+    status_label = "✅ Активно" if status == "1" else "❌ Отменено"
+    return (
+        f"⏰ Напоминание #{reminder['id']}\n"
+        f"Тип: {type_label}\n"
+        f"Текст: {escape(str(reminder.get('text', '')))}\n"
+        f"Статус: {status_label}"
+    )
+
+
+def broadcast_card(broadcast: dict[str, Any]) -> str:
+    return (
+        f"📣 Рассылка #{broadcast['id']}\n"
+        f"Текст: {escape(str(broadcast.get('text', '')))}\n"
+        f"Доставлено: {broadcast.get('delivered', 0)}/{broadcast.get('total', 0)}"
+    )

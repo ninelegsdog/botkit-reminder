@@ -1,44 +1,69 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from typing import Any
-
 import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.core.database import Base
-from src.core.uow import UnitOfWork
-from src.reminder.models import ReminderType
-from src.reminder.service import ReminderService, SubscriptionService
-
-
-@pytest.fixture
-async def session_factory(tmp_path: Any) -> Any:
-    db = tmp_path / "test.db"
-    engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    return factory
+from src.reminder import service
 
 
 @pytest.mark.asyncio
-async def test_create_reminder(session_factory: Any) -> None:
-    async with session_factory() as session:
-        uow = UnitOfWork(session)
-        service = ReminderService(uow)
-        fire_at = datetime.now(UTC) + timedelta(hours=1)
-        reminder = await service.create_reminder(1, ReminderType.once, "Test", fire_at=fire_at)
-        assert reminder.id is not None
-        assert reminder.text == "Test"
+async def test_subscribe(db):
+    await service.subscribe(db, 123, "testuser", "Test")
+    subscribers = await service.get_active_subscribers(db)
+    assert len(subscribers) == 1
 
 
 @pytest.mark.asyncio
-async def test_subscribe(session_factory: Any) -> None:
-    async with session_factory() as session:
-        uow = UnitOfWork(session)
-        service = SubscriptionService(uow)
-        sub = await service.subscribe(1, "user", "Name")
-        assert sub.is_active is True
-        await service.unsubscribe(1)
-        assert sub.is_active is False
+async def test_unsubscribe(db):
+    await service.subscribe(db, 123, "testuser", "Test")
+    await service.unsubscribe(db, 123)
+    subscribers = await service.get_active_subscribers(db)
+    assert len(subscribers) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_reminder_once(db):
+    rem_id = await service.create_reminder(
+        db, creator_id=123, reminder_type="once", fire_at="2026-01-01 09:00:00", text_content="Test"
+    )
+    assert rem_id > 0
+
+
+@pytest.mark.asyncio
+async def test_create_reminder_recurring(db):
+    rem_id = await service.create_reminder(
+        db, creator_id=123, reminder_type="recurring", fire_at="09:00:00",
+        text_content="Weekly", cron_day=0
+    )
+    assert rem_id > 0
+
+
+@pytest.mark.asyncio
+async def test_get_user_reminders(db):
+    await service.create_reminder(
+        db, creator_id=123, reminder_type="once", fire_at="2026-01-01 09:00:00", text_content="Test"
+    )
+    reminders = await service.get_user_reminders(db, 123)
+    assert len(reminders) == 1
+
+
+@pytest.mark.asyncio
+async def test_cancel_reminder(db):
+    rem_id = await service.create_reminder(
+        db, creator_id=123, reminder_type="once", fire_at="2026-01-01 09:00:00", text_content="Test"
+    )
+    await service.cancel_reminder(db, rem_id)
+    reminders = await service.get_user_reminders(db, 123)
+    assert len(reminders) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_broadcast(db):
+    bc_id = await service.create_broadcast(db, text_content="Hello", segment="all")
+    assert bc_id > 0
+
+
+@pytest.mark.asyncio
+async def test_get_broadcasts(db):
+    await service.create_broadcast(db, text_content="Hello", segment="all")
+    broadcasts = await service.get_broadcasts(db)
+    assert len(broadcasts) == 1

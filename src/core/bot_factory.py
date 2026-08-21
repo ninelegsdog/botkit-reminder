@@ -2,30 +2,25 @@ from __future__ import annotations
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
-from aiogram.fsm.storage.base import BaseStorage
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 
-from src.core.config import settings
+from src.core.config import Config
+from src.core.database import Database
+from src.core.metrics import Metrics
+from src.core.storage import Storage
 
 
 class AppState:
-    def __init__(self) -> None:
-        self.bot = Bot(
-            token=settings.telegram_bot_token,
-            default=DefaultBotProperties(parse_mode="HTML"),
-        )
-        self.storage: BaseStorage = MemoryStorage()
-        if settings.redis_url:
-            try:
-                self.storage = RedisStorage.from_url(settings.redis_url)
-            except Exception:
-                self.storage = MemoryStorage()
-        self.dp = Dispatcher(storage=self.storage)
+    def __init__(self, config: Config) -> None:
+        self.config = config
+        self.db = Database(config)
+        self.storage = Storage(self.db)
+        self.metrics = Metrics()
+        self.bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode="HTML"))
+        self.dp = Dispatcher()
+        self.fsm_storage = RedisStorage.from_url(config.redis_url)
 
 
-state = AppState()
-
-
-def create_bot() -> AppState:
-    return state
+def create_app(config: Config | None = None) -> AppState:
+    cfg = config or Config.from_env()
+    return AppState(cfg)

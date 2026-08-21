@@ -1,31 +1,30 @@
 from __future__ import annotations
 
 import time
-from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from aiogram import types
-from aiogram.dispatcher.middlewares.base import BaseMiddleware
-
-_THROTTLE: dict[str, dict[int, float]] = defaultdict(dict)
+from aiogram import BaseMiddleware
+from aiogram.types import Message, TelegramObject
 
 
 class ThrottlingMiddleware(BaseMiddleware):
+    def __init__(self, min_interval: float = 2.0) -> None:
+        super().__init__()
+        self._min_interval = min_interval
+        self._last_message: dict[int, float] = {}
+
     async def __call__(
         self,
-        handler: Callable[..., Awaitable[Any]],
-        event: types.TelegramObject,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        user = getattr(event, "from_user", None)
-        if not user:
-            return await handler(event, **data)
-
-        key = f"{handler.__name__}:{user.id}"
-        now = time.time()
-        last = _THROTTLE[key].get(user.id, 0)
-        if now - last < 0.5:
-            return
-        _THROTTLE[key][user.id] = now
-        return await handler(event, **data)
+        if isinstance(event, Message):
+            user_id = event.from_user.id if event.from_user else 0
+            now = time.time()
+            last = self._last_message.get(user_id, 0.0)
+            if now - last < self._min_interval:
+                return None
+            self._last_message[user_id] = now
+        return await handler(event, data)

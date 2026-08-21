@@ -1,51 +1,30 @@
 from __future__ import annotations
 
-from pathlib import Path
+import os
+from dataclasses import dataclass, field
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-    telegram_bot_token: str
-    telegram_webhook_secret: str
-    telegram_admin_ids: str
-    admin_password_hash: str
-
-    database_url: str = "sqlite+aiosqlite:///./data/reminder.db"
+@dataclass(frozen=True)
+class Config:
+    bot_token: str = ""
+    admin_password: str = ""
     redis_url: str = "redis://localhost:6379/0"
-
-    tz: str = "Europe/Moscow"
-
-    scheduler_interval_seconds: int = 30
-
-    yookassa_shop_id: str = ""
-    yookassa_secret_key: str = ""
-    telegram_stars_provider_enabled: bool = True
-
+    db_path: str = "data/reminder.db"
     log_level: str = "INFO"
+    scheduler_interval: int = 30
 
-    @property
-    def admin_ids(self) -> list[int]:
-        return [int(x.strip()) for x in self.telegram_admin_ids.split(",") if x.strip()]
-
-    def validate_on_startup(self) -> None:
-        if not self.telegram_bot_token or ":" not in self.telegram_bot_token:
-            raise RuntimeError("TELEGRAM_BOT_TOKEN is invalid")
-        if self.telegram_webhook_secret == "change-me":
-            raise RuntimeError("TELEGRAM_WEBHOOK_SECRET must be changed from default")
-        if not self.admin_ids:
-            raise RuntimeError("TELEGRAM_ADMIN_IDS is empty")
-        if not self.admin_password_hash:
-            raise RuntimeError("ADMIN_PASSWORD_HASH is not set")
-        if self.scheduler_interval_seconds <= 0:
-            raise RuntimeError("SCHEDULER_INTERVAL_SECONDS must be positive")
+    @classmethod
+    def from_env(cls) -> Config:
+        return cls(
+            bot_token=os.getenv("BOT_TOKEN", ""),
+            admin_password=os.getenv("ADMIN_PASSWORD", ""),
+            redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+            db_path=os.getenv("DB_PATH", "data/reminder.db"),
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+            scheduler_interval=int(os.getenv("SCHEDULER_INTERVAL", "30")),
+        )
 
 
-settings = Settings()
-
-DATA_DIR = Path("./data")
-DATA_DIR.mkdir(exist_ok=True)
-
-settings.validate_on_startup()
+@dataclass
+class State:
+    config: Config = field(default_factory=Config.from_env)
