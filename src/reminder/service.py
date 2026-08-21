@@ -20,7 +20,7 @@ from src.reminder.models import (
 
 
 class ReminderService:
-    def __init__(self, session: AsyncSession, bot: Bot) -> None:
+    def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
         self.session = session
         self.bot = bot
 
@@ -86,6 +86,8 @@ class ReminderService:
             reminder.is_active = False
 
     async def send_reminder(self, reminder: Reminder) -> None:
+        if not self.bot:
+            return
         recipients = await self._get_recipients(reminder.id)
         for rr in recipients:
             try:
@@ -106,7 +108,7 @@ class ReminderService:
 
 
 class BroadcastService:
-    def __init__(self, session: AsyncSession, bot: Bot) -> None:
+    def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
         self.session = session
         self.bot = bot
 

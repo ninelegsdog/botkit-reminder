@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.storage.base import BaseStorage
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 
@@ -14,7 +15,7 @@ class AppState:
             token=settings.telegram_bot_token,
             default=DefaultBotProperties(parse_mode="HTML"),
         )
-        self.storage = MemoryStorage()
+        self.storage: BaseStorage = MemoryStorage()
         if settings.redis_url:
             try:
                 self.storage = RedisStorage.from_url(settings.redis_url)

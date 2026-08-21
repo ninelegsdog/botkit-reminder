@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.reminder.models import Base, ReminderType
+from src.core.database import Base
+from src.reminder.models import ReminderType
 from src.reminder.scheduler import Scheduler
 
 
 @pytest.fixture
-async def session_factory(tmp_path):
+async def session_factory(tmp_path: Any) -> Any:
     db = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
     async with engine.begin() as conn:
@@ -20,8 +22,8 @@ async def session_factory(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_sends_due_reminders(session_factory):
-    sent = []
+async def test_scheduler_sends_due_reminders(session_factory: Any) -> None:
+    sent: list[tuple[int, str]] = []
 
     async def send_callback(user_id: int, text: str) -> None:
         sent.append((user_id, text))
@@ -34,7 +36,6 @@ async def test_scheduler_sends_due_reminders(session_factory):
         await service.create_reminder(1, ReminderType.once, "Due", fire_at=fire_at)
         await session.commit()
 
-    scheduler._running = True
     await scheduler._tick()
     assert len(sent) == 1
     assert sent[0] == (1, "Due")

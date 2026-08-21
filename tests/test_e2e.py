@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -12,14 +13,14 @@ from src.reminder import register_routers
 
 
 @pytest.mark.asyncio
-async def test_start_command():
+async def test_start_command() -> None:
     bot = Bot(token="123:ABC")
     mock_response = AsyncMock()
     mock_response.status = 200
     mock_response.json = AsyncMock(return_value={"ok": True, "result": {"message_id": 1}})
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock(return_value=False)
-    
+
     with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response):
         dp = Dispatcher(storage=MemoryStorage())
         app_state = create_bot()
@@ -28,7 +29,7 @@ async def test_start_command():
         register_routers(app_state)
         message = Message(
             message_id=1,
-            date=0,
+            date=datetime.now(),
             chat=Chat(id=1, type="private"),
             from_user=User(id=1, is_bot=False, first_name="Test"),
             text="/start",

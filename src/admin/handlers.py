@@ -26,6 +26,8 @@ def create_router() -> Router:
     @router.message(F.state == "admin:password")
     async def admin_password(message: Message, state: Any) -> None:
         from src.core.auth import admin_gate, verify_password
+        if not message.from_user or not message.text:
+            return
         if verify_password(message.text):
             admin_gate.login(message.from_user.id)
             await state.clear()

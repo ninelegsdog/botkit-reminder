@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, Message
 
 
 def escape(text: str) -> str:
@@ -15,7 +15,7 @@ def truncate(text: str, limit: int = 4096) -> str:
     return text[: limit - 3] + "..."
 
 
-async def safe_edit_text(message, text: str, reply_markup: InlineKeyboardMarkup | None = None) -> None:
+async def safe_edit_text(message: Message, text: str, reply_markup: InlineKeyboardMarkup | None = None) -> None:
     safe = truncate(text)
     if reply_markup is None:
         await message.edit_text(safe)

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.reminder.models import Base, Reminder, ReminderStatus, ReminderType
+from src.core.database import Base
+from src.reminder.models import Reminder, ReminderStatus, ReminderType
 from src.reminder.service import ReminderService, SubscriptionService
 
 
 @pytest.fixture
-async def session_factory(tmp_path):
+async def session_factory(tmp_path: Any) -> Any:
     db = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
     async with engine.begin() as conn:
@@ -20,7 +22,7 @@ async def session_factory(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_get_due_reminders(session_factory):
+async def test_get_due_reminders(session_factory: Any) -> None:
     async with session_factory() as session:
         service = ReminderService(session, None)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
@@ -34,7 +36,7 @@ async def test_get_due_reminders(session_factory):
 
 
 @pytest.mark.asyncio
-async def test_mark_done(session_factory):
+async def test_mark_done(session_factory: Any) -> None:
     async with session_factory() as session:
         service = ReminderService(session, None)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
@@ -47,7 +49,7 @@ async def test_mark_done(session_factory):
 
 
 @pytest.mark.asyncio
-async def test_cancel_reminder(session_factory):
+async def test_cancel_reminder(session_factory: Any) -> None:
     async with session_factory() as session:
         service = ReminderService(session, None)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
@@ -61,7 +63,7 @@ async def test_cancel_reminder(session_factory):
 
 
 @pytest.mark.asyncio
-async def test_subscribe_and_unsubscribe(session_factory):
+async def test_subscribe_and_unsubscribe(session_factory: Any) -> None:
     async with session_factory() as session:
         service = SubscriptionService(session)
         sub = await service.subscribe(1, "user", "Name")

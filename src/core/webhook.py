@@ -21,7 +21,7 @@ async def metrics() -> Response:
 
 
 @app.post("/webhook/{bot_token}")
-async def telegram_webhook(bot_token: str, request: Request) -> dict[str, str]:
+async def telegram_webhook(bot_token: str, request: Request) -> dict[str, str | bool]:
     if settings.telegram_webhook_secret and settings.telegram_webhook_secret != "change-me":
         secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
         if not secret or not hmac.compare_digest(secret, settings.telegram_webhook_secret):

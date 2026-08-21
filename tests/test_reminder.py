@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from src.reminder.models import Base, ReminderType
+from src.core.database import Base
+from src.reminder.models import ReminderType
 from src.reminder.service import ReminderService, SubscriptionService
 
 
 @pytest.fixture
-async def session_factory(tmp_path):
+async def session_factory(tmp_path: Any) -> Any:
     db = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
     async with engine.begin() as conn:
@@ -20,7 +22,7 @@ async def session_factory(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_create_reminder(session_factory):
+async def test_create_reminder(session_factory: Any) -> None:
     async with session_factory() as session:
         service = ReminderService(session, None)
         fire_at = datetime.now(UTC) + timedelta(hours=1)
@@ -30,7 +32,7 @@ async def test_create_reminder(session_factory):
 
 
 @pytest.mark.asyncio
-async def test_subscribe(session_factory):
+async def test_subscribe(session_factory: Any) -> None:
     async with session_factory() as session:
         service = SubscriptionService(session)
         sub = await service.subscribe(1, "user", "Name")

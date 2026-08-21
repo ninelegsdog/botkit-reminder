@@ -49,6 +49,8 @@ def create_router() -> Router:
 
     @router.message(F.text == "🔔 Подписаться")
     async def subscribe(message: Message) -> None:
+        if not message.from_user:
+            return
         async with get_session() as session:
             service = SubscriptionService(session)
             await service.subscribe(message.from_user.id, message.from_user.username, message.from_user.full_name)
@@ -64,6 +66,8 @@ def create_router() -> Router:
 
     @router.message(F.text == "🔕 Отписаться")
     async def unsubscribe(message: Message) -> None:
+        if not message.from_user:
+            return
         async with get_session() as session:
             service = SubscriptionService(session)
             await service.unsubscribe(message.from_user.id)
@@ -88,7 +92,8 @@ def create_router() -> Router:
     @router.callback_query(F.data == "rem:type:once")
     async def once_type(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(type=ReminderType.once.value)
-        await callback.message.edit_text("Введите дату в формате ДД.ММ.ГГГГ")
+        if callback.message:
+            await callback.message.edit_text("Введите дату в формате ДД.ММ.ГГГГ")  # type: ignore[union-attr]
         await state.set_state("reminder:date")
 
     @router.callback_query(F.data == "rem:type:recurring")
@@ -99,17 +104,21 @@ def create_router() -> Router:
         for i, d in enumerate(days):
             kb.add(InlineKeyboardButton(text=d, callback_data=f"rem:day:{i}"))
         kb.adjust(4)
-        await callback.message.edit_text("Выберите день недели:", reply_markup=kb.as_markup())
+        if callback.message:
+            await callback.message.edit_text("Выберите день недели:", reply_markup=kb.as_markup())  # type: ignore[union-attr]
 
     @router.callback_query(F.data.startswith("rem:day:"))
     async def day_selected(callback: CallbackQuery, state: FSMContext) -> None:
-        day = callback.data.split(":")[-1]
+        day = callback.data.split(":")[-1]  # type: ignore[union-attr]
         await state.update_data(cron_day=day)
-        await callback.message.edit_text("Введите время ЧЧ:ММ")
+        if callback.message:
+            await callback.message.edit_text("Введите время ЧЧ:ММ")  # type: ignore[union-attr]
         await state.set_state("reminder:time")
 
     @router.message(F.state == "reminder:date")
     async def date_entered(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
         try:
             fire_at = datetime.strptime(message.text.strip(), "%d.%m.%Y")
         except ValueError:
@@ -121,6 +130,8 @@ def create_router() -> Router:
 
     @router.message(F.state == "reminder:time")
     async def time_entered(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
         try:
             h, m = map(int, message.text.strip().split(":"))
         except Exception:
@@ -138,7 +149,7 @@ def create_router() -> Router:
         async with get_session() as session:
             service = ReminderService(session, None)
             reminder = await service.create_reminder(
-                creator_id=message.from_user.id,
+                creator_id=message.from_user.id if message.from_user else 0,
                 type=ReminderType(data["type"]),
                 text=text or "Напоминание",
                 fire_at=fire_at,
@@ -156,6 +167,8 @@ def create_router() -> Router:
 
     @router.message(F.text == "⏰ Мои напоминания")
     async def my_reminders(message: Message) -> None:
+        if not message.from_user:
+            return
         async with get_session() as session:
             from sqlalchemy import select
             stmt = select(Reminder).where(Reminder.creator_id == message.from_user.id).order_by(Reminder.id.desc())
@@ -182,26 +195,35 @@ def create_router() -> Router:
 
     @router.callback_query(F.data.startswith("rem:delete:"))
     async def delete_reminder_prompt(callback: CallbackQuery) -> None:
+        if not callback.data:
+            return
         reminder_id = int(callback.data.split(":")[-1])
-        await callback.message.edit_text("❓ Удалить это напоминание?", reply_markup=_delete_button(reminder_id))
+        if callback.message:
+            await callback.message.edit_text("❓ Удалить это напоминание?", reply_markup=_delete_button(reminder_id))  # type: ignore[union-attr]
 
     @router.callback_query(F.data.startswith("rem:confirm:delete:"))
     async def delete_reminder_confirm(callback: CallbackQuery) -> None:
+        if not callback.data:
+            return
         reminder_id = int(callback.data.split(":")[-1])
         async with get_session() as session:
             from sqlalchemy import delete as sqla_delete
             await session.execute(sqla_delete(Reminder).where(Reminder.id == reminder_id))
             await session.commit()
-        await callback.message.edit_text("✅ Напоминание удалено")
+        if callback.message:
+            await callback.message.edit_text("✅ Напоминание удалено")  # type: ignore[union-attr]
         await callback.answer()
 
     @router.callback_query(F.data == "rem:cancel")
     async def delete_cancel(callback: CallbackQuery) -> None:
-        await callback.message.edit_text("❌ Отменено")
+        if callback.message:
+            await callback.message.edit_text("❌ Отменено")  # type: ignore[union-attr]
         await callback.answer()
 
     @router.message(F.text == "📣 Рассылки")
     async def broadcasts(message: Message, state: FSMContext) -> None:
+        if not message.from_user:
+            return
         async with get_session() as session:
             service = SubscriptionService(session)
             sub = await service.get_subscriber(message.from_user.id)
@@ -216,6 +238,8 @@ def create_router() -> Router:
 
     @router.message(F.state == "broadcast:text")
     async def broadcast_text(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
         async with get_session() as session:
             service = BroadcastService(session, None)
             broadcast = await service.create_broadcast(message.text, segment="active")
@@ -238,6 +262,8 @@ def create_router() -> Router:
     @router.message(F.state == "admin:password")
     async def admin_password(message: Message, state: FSMContext) -> None:
         from src.core.auth import admin_gate, verify_password
+        if not message.from_user or not message.text:
+            return
         if verify_password(message.text):
             admin_gate.login(message.from_user.id)
             await state.clear()

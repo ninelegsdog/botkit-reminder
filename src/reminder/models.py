@@ -116,6 +116,7 @@ class BroadcastRecipient(Base):
     status: Mapped[BroadcastStatus] = mapped_column(
         SQLEnum(BroadcastStatus), default=BroadcastStatus.pending, nullable=False
     )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("broadcast_id", "user_id", name="uq_broadcast_recipient"),
