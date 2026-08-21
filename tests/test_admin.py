@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.admin.service import AdminService
 from src.core.database import Base
+from src.core.uow import UnitOfWork
 
 
 @pytest.fixture
@@ -22,7 +23,8 @@ async def session_factory(tmp_path: Any) -> Any:
 @pytest.mark.asyncio
 async def test_admin_stats(session_factory: Any) -> None:
     async with session_factory() as session:
-        service = AdminService(session)
+        uow = UnitOfWork(session)
+        service = AdminService(uow)
         stats = await service.stats()
         assert "subscribers" in stats
         assert "reminders" in stats

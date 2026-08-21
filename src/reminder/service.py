@@ -10,6 +10,8 @@ from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.metrics import BROADCAST_SENT
+from src.core.uow import UnitOfWork
 from src.reminder.models import (
     Broadcast,
     BroadcastRecipient,
@@ -26,11 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 class ReminderService:
-    def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
-        self.session = session
+    def __init__(self, uow: UnitOfWork, bot: Bot | None = None) -> None:
+        self._uow = uow
         self.bot = bot
-        self._reminders = ReminderRepository(session)
-        self._subscribers = SubscriberRepository(session)
+        self._reminders = ReminderRepository(uow)
+        self._subscribers = SubscriberRepository(uow)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
 
     async def create_reminder(
         self,
@@ -101,11 +107,15 @@ class ReminderService:
 
 
 class BroadcastService:
-    def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
-        self.session = session
+    def __init__(self, uow: UnitOfWork, bot: Bot | None = None) -> None:
+        self._uow = uow
         self.bot = bot
-        self._recipients = BroadcastRecipientRepository(session)
-        self._subscribers = SubscriberRepository(session)
+        self._recipients = BroadcastRecipientRepository(uow)
+        self._subscribers = SubscriberRepository(uow)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
 
     async def create_broadcast(self, text: str, segment: str) -> Broadcast:
         broadcast = Broadcast(text=text, segment=segment)
@@ -141,9 +151,11 @@ class BroadcastService:
                 recipient.status = BroadcastStatus.delivered
                 recipient.delivered_at = datetime.now(UTC)
                 delivered += 1
+                BROADCAST_SENT.labels(status="delivered").inc()
             except Exception:
                 recipient.status = BroadcastStatus.failed
                 failed += 1
+                BROADCAST_SENT.labels(status="failed").inc()
 
         broadcast.total = total
         broadcast.delivered = delivered
@@ -169,8 +181,13 @@ class BroadcastService:
 
 
 class SubscriptionService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.session = session
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+        self._subscribers = SubscriberRepository(uow)
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._uow.session
 
     async def subscribe(self, user_id: int, username: str | None, name: str | None) -> Subscriber:
         stmt = select(Subscriber).where(Subscriber.user_id == user_id)

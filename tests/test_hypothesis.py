@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.core.database import Base
+from src.core.uow import UnitOfWork
 from src.reminder.models import ReminderStatus, ReminderType
 from src.reminder.service import ReminderService
 
@@ -30,7 +31,8 @@ async def session_factory(tmp_path: Any) -> Any:
 )
 async def test_create_reminder_property(session_factory: Any, user_id: int, text: str) -> None:
     async with session_factory() as session:
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         fire_at = datetime.now(UTC) + timedelta(hours=1)
         reminder = await service.create_reminder(user_id, ReminderType.once, text, fire_at=fire_at)
         assert reminder.id is not None
@@ -46,7 +48,8 @@ async def test_create_reminder_property(session_factory: Any, user_id: int, text
 )
 async def test_get_due_reminders_property(session_factory: Any, offset_minutes: int) -> None:
     async with session_factory() as session:
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         now = datetime.now(UTC)
         past = now - timedelta(minutes=120)
         future = now + timedelta(hours=2)

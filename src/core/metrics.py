@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from aiogram import types
-from prometheus_client import Counter, Gauge, start_http_server
+from prometheus_client import Counter, start_http_server
 
-MESSAGES_TOTAL = Counter("bot_messages_total", "Total messages", ["handler", "status"])
-ACTIVE_USERS = Gauge("bot_active_users", "Active users", ["period"])
-
-
-async def metrics_handler(event: types.Message) -> None:
-    pass
+SCHEDULER_TICKS = Counter("scheduler_ticks_total", "Scheduler ticks", ["status"])
+SCHEDULER_ERRORS = Counter("scheduler_errors_total", "Scheduler tick errors", ["error_type"])
+REMINDERS_SENT = Counter("reminders_sent_total", "Reminders sent", ["type"])
+BROADCAST_SENT = Counter("broadcast_sent_total", "Broadcast messages sent", ["status"])
+ERROR_HANDLER_ERRORS = Counter("error_handler_errors_total", "Errors caught by global handler", ["error_type"])
+WEBHOOK_REQUESTS = Counter("webhook_requests_total", "Webhook requests", ["status"])
 
 
 def start_metrics(port: int = 9090) -> None:

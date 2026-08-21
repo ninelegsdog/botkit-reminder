@@ -6,12 +6,17 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.uow import UnitOfWork
 from src.reminder.models import Reminder, ReminderRecipient, ReminderStatus, ReminderType, Subscriber
 
 
 class ReminderRepository:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    @property
+    def _session(self) -> AsyncSession:
+        return self._uow.session
 
     async def get_due_once(self, now: datetime) -> Sequence[Reminder]:
         stmt = select(Reminder).where(
@@ -50,8 +55,12 @@ class ReminderRepository:
 
 
 class BroadcastRecipientRepository:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    @property
+    def _session(self) -> AsyncSession:
+        return self._uow.session
 
     async def get_pending(self) -> Sequence[ReminderRecipient]:
         from src.reminder.models import BroadcastStatus
@@ -61,8 +70,12 @@ class BroadcastRecipientRepository:
 
 
 class SubscriberRepository:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    @property
+    def _session(self) -> AsyncSession:
+        return self._uow.session
 
     async def get_active(self, segment: str) -> Sequence[Subscriber]:
         stmt = select(Subscriber).where(Subscriber.is_active)

@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.core.database import Base
+from src.core.uow import UnitOfWork
 from src.reminder.models import Reminder, ReminderStatus, ReminderType
 from src.reminder.service import ReminderService, SubscriptionService
 
@@ -24,7 +25,8 @@ async def session_factory(tmp_path: Any) -> Any:
 @pytest.mark.asyncio
 async def test_get_due_reminders(session_factory: Any) -> None:
     async with session_factory() as session:
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
         await service.create_reminder(1, ReminderType.once, "Past", fire_at=fire_at)
         future = datetime.now(UTC) + timedelta(hours=1)
@@ -38,7 +40,8 @@ async def test_get_due_reminders(session_factory: Any) -> None:
 @pytest.mark.asyncio
 async def test_mark_done(session_factory: Any) -> None:
     async with session_factory() as session:
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
         reminder = await service.create_reminder(1, ReminderType.once, "Test", fire_at=fire_at)
         await session.commit()
@@ -51,7 +54,8 @@ async def test_mark_done(session_factory: Any) -> None:
 @pytest.mark.asyncio
 async def test_cancel_reminder(session_factory: Any) -> None:
     async with session_factory() as session:
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
         reminder = await service.create_reminder(1, ReminderType.once, "Test", fire_at=fire_at)
         await session.commit()
@@ -65,7 +69,8 @@ async def test_cancel_reminder(session_factory: Any) -> None:
 @pytest.mark.asyncio
 async def test_subscribe_and_unsubscribe(session_factory: Any) -> None:
     async with session_factory() as session:
-        service = SubscriptionService(session)
+        uow = UnitOfWork(session)
+        service = SubscriptionService(uow)
         sub = await service.subscribe(1, "user", "Name")
         assert sub.is_active is True
         await service.unsubscribe(1)

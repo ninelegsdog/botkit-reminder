@@ -9,6 +9,8 @@ from typing import Any
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
 from aiogram.types import TelegramObject
 
+from src.core.metrics import ERROR_HANDLER_ERRORS
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,12 +25,15 @@ async def _handle_retry_after(event: TelegramObject, exc: TelegramRetryAfter) ->
 
 async def default_error_handler(event: TelegramObject, exc: Exception) -> None:
     if isinstance(exc, TelegramRetryAfter):
+        ERROR_HANDLER_ERRORS.labels(error_type="retry_after").inc()
         logger.warning("TelegramRetryAfter: %s", exc)
         await _handle_retry_after(event, exc)
         return
     if isinstance(exc, TelegramNetworkError):
+        ERROR_HANDLER_ERRORS.labels(error_type="network_error").inc()
         logger.warning("TelegramNetworkError: %s", exc)
         return
+    ERROR_HANDLER_ERRORS.labels(error_type="unhandled").inc()
     logger.critical("Unhandled error: %s", exc, exc_info=True)
 
 

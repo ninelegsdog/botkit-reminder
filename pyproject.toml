@@ -17,6 +17,7 @@ dependencies = [
     "aiohttp>=3.9",
     "pydantic-settings>=2.0",
     "apscheduler>=3.10",
+    "prometheus-client>=0.20",
 ]
 
 [project.optional-dependencies]
@@ -37,8 +38,11 @@ bot = "botkit_reminder.bot:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=50"
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=50 -m 'not integration'"
 filterwarnings = ["error::DeprecationWarning"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 
 [tool.ruff]
 line-length = 120

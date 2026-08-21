@@ -11,6 +11,7 @@ from src.admin.service import AdminService
 from src.core.auth import admin_only
 from src.core.navigation import reply_menu
 from src.core.ui import escape
+from src.core.uow import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +46,16 @@ def create_router() -> Router:
     @admin_only
     @router.message(F.text == "📊 Статистика")
     async def admin_stats(message: Message) -> None:
-        from src.core.database import get_session
-        async with get_session() as session:
-            service = AdminService(session)
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
             stats = await service.stats()
         await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
 
     @admin_only
     @router.message(F.text == "👥 Подписчики")
     async def admin_subscribers(message: Message) -> None:
-        from src.core.database import get_session
-        async with get_session() as session:
-            service = AdminService(session)
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
             subs = await service.subscribers()
         lines = [f"{s.user_id} @{escape(s.username or '-')} {escape(s.name or '')}" for s in subs[:50]]
         await message.answer("\n".join(lines) or "Нет подписчиков")

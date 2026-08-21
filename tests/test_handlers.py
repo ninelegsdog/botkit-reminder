@@ -21,18 +21,24 @@ def app_state() -> Any:
 
 
 @pytest.fixture
-def mock_session() -> Any:
+def mock_uow() -> Any:
     session = MagicMock()
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)
     session.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
     session.flush = AsyncMock()
     session.commit = AsyncMock()
-    return session
+    session.add = MagicMock()
+
+    uow = MagicMock()
+    uow.__aenter__ = AsyncMock(return_value=uow)
+    uow.__aexit__ = AsyncMock(return_value=False)
+    uow.session = session
+    return uow
 
 
 @pytest.mark.asyncio
-async def test_add_reminder_shows_types(app_state: Any, mock_session: Any) -> None:
+async def test_add_reminder_shows_types(app_state: Any, mock_uow: Any) -> None:
     bot = Bot(token="123:ABC")
     app_state.bot = bot
     register_routers(app_state)
@@ -49,13 +55,13 @@ async def test_add_reminder_shows_types(app_state: Any, mock_session: Any) -> No
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock(return_value=False)
     with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response), \
-         patch("src.reminder.handlers.get_session", return_value=mock_session):
+         patch("src.reminder.handlers.UnitOfWork", return_value=mock_uow):
         await app_state.dp.feed_update(bot, update)
         assert True
 
 
 @pytest.mark.asyncio
-async def test_subscribe_flow(app_state: Any, mock_session: Any) -> None:
+async def test_subscribe_flow(app_state: Any, mock_uow: Any) -> None:
     bot = Bot(token="123:ABC")
     app_state.bot = bot
     register_routers(app_state)
@@ -72,6 +78,6 @@ async def test_subscribe_flow(app_state: Any, mock_session: Any) -> None:
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock(return_value=False)
     with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response), \
-         patch("src.reminder.handlers.get_session", return_value=mock_session):
+         patch("src.reminder.handlers.UnitOfWork", return_value=mock_uow):
         await app_state.dp.feed_update(bot, update)
         assert True

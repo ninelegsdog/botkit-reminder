@@ -13,6 +13,7 @@ from src.core.logging import configure_logging
 from src.core.metrics import start_metrics
 from src.core.webhook import app as webhook_app
 from src.reminder import register_routers
+from src.reminder.scheduler import Scheduler
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -44,9 +45,16 @@ async def _run_webhook() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from src.core.database import async_session
+    scheduler = Scheduler(async_session, state.bot.send_message)
+    scheduler.start()
     await _run_webhook()
     start_metrics(9090)
-    yield
+    try:
+        yield
+    finally:
+        scheduler.stop()
+        await state.bot.session.close()
 
 
 def create_app() -> FastAPI:

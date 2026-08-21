@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
+from src.core.metrics import REMINDERS_SENT, SCHEDULER_ERRORS, SCHEDULER_TICKS
+from src.core.uow import UnitOfWork
 from src.reminder.models import BroadcastStatus, Reminder, ReminderRecipient, ReminderStatus, ReminderType
 from src.reminder.service import ReminderService
 
@@ -50,6 +52,7 @@ class Scheduler:
         logger.info("Scheduler stopped")
 
     async def _tick(self) -> None:
+        SCHEDULER_TICKS.labels(status="started").inc()
         try:
             async with self._session_factory() as session:
                 now = datetime.now(UTC)
@@ -78,32 +81,38 @@ class Scheduler:
                 pending_result = await session.execute(pending_recipients_stmt)
                 pending_recipients = pending_result.scalars().all()
 
-            for reminder in due_once:
-                try:
-                    await self._send_callback(reminder.creator_id, reminder.text)
-                except Exception:
-                    logger.exception("Failed to send reminder %s", reminder.id)
-                async with self._session_factory() as session:
-                    service = ReminderService(session, None)
-                    await service.mark_done(reminder.id)
-                    await session.commit()
-
-            for reminder in due_recurring:
-                cron_day = reminder.cron_day
-                if cron_day is None:
-                    continue
-                try:
-                    if datetime.now(UTC).weekday() == int(cron_day):
+                uow = UnitOfWork(session)
+                for reminder in due_once:
+                    try:
                         await self._send_callback(reminder.creator_id, reminder.text)
-                except Exception:
-                    logger.exception("Failed to send recurring reminder %s", reminder.id)
+                        REMINDERS_SENT.labels(type=reminder.type.value).inc()
+                    except Exception:
+                        SCHEDULER_ERRORS.labels(error_type="send").inc()
+                        logger.exception("Failed to send reminder %s", reminder.id)
+                    service = ReminderService(uow)
+                    await service.mark_done(reminder.id)
 
-            for rr in pending_recipients:
-                try:
-                    await self._send_callback(rr.user_id, "Напоминание")
-                    rr.status = BroadcastStatus.delivered
-                    rr.delivered_at = datetime.now(UTC)
-                except Exception:
-                    rr.status = BroadcastStatus.failed
+                for reminder in due_recurring:
+                    cron_day = reminder.cron_day
+                    if cron_day is None:
+                        continue
+                    try:
+                        if datetime.now(UTC).weekday() == int(cron_day):
+                            await self._send_callback(reminder.creator_id, reminder.text)
+                            REMINDERS_SENT.labels(type=reminder.type.value).inc()
+                    except Exception:
+                        SCHEDULER_ERRORS.labels(error_type="send").inc()
+                        logger.exception("Failed to send recurring reminder %s", reminder.id)
+
+                for rr in pending_recipients:
+                    try:
+                        await self._send_callback(rr.user_id, "Напоминание")
+                        rr.status = BroadcastStatus.delivered
+                        rr.delivered_at = datetime.now(UTC)
+                    except Exception:
+                        rr.status = BroadcastStatus.failed
+            SCHEDULER_TICKS.labels(status="success").inc()
         except Exception as exc:
+            SCHEDULER_ERRORS.labels(error_type="tick").inc()
+            SCHEDULER_TICKS.labels(status="failed").inc()
             logger.exception("Scheduler tick failed: %s", exc)

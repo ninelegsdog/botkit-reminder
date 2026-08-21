@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.core.database import Base
+from src.core.uow import UnitOfWork
 from src.reminder.models import ReminderType
 from src.reminder.scheduler import Scheduler
 
@@ -31,7 +32,8 @@ async def test_scheduler_sends_due_reminders(session_factory: Any) -> None:
     scheduler = Scheduler(session_factory, send_callback)
     async with session_factory() as session:
         from src.reminder.service import ReminderService
-        service = ReminderService(session, None)
+        uow = UnitOfWork(session)
+        service = ReminderService(uow)
         fire_at = datetime.now(UTC) - timedelta(minutes=1)
         await service.create_reminder(1, ReminderType.once, "Due", fire_at=fire_at)
         await session.commit()

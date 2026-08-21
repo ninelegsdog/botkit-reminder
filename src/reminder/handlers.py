@@ -10,10 +10,10 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.core.auth import admin_only
-from src.core.database import get_session
 from src.core.navigation import compose_message, nav_header, reply_menu
 from src.core.ui import escape
-from src.reminder.models import Reminder, ReminderType
+from src.core.uow import UnitOfWork
+from src.reminder.models import ReminderType
 from src.reminder.service import BroadcastService, ReminderService, SubscriptionService
 
 logger = logging.getLogger(__name__)
@@ -51,8 +51,8 @@ def create_router() -> Router:
     async def subscribe(message: Message) -> None:
         if not message.from_user:
             return
-        async with get_session() as session:
-            service = SubscriptionService(session)
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
             await service.subscribe(message.from_user.id, message.from_user.username, message.from_user.full_name)
         await message.answer(
             "✅ Вы подписаны на рассылки",
@@ -68,8 +68,8 @@ def create_router() -> Router:
     async def unsubscribe(message: Message) -> None:
         if not message.from_user:
             return
-        async with get_session() as session:
-            service = SubscriptionService(session)
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
             await service.unsubscribe(message.from_user.id)
         await message.answer(
             "✅ Вы отписались от рассылок",
@@ -146,8 +146,8 @@ def create_router() -> Router:
             await state.clear()
             return
         text = data.get("text") or message.text
-        async with get_session() as session:
-            service = ReminderService(session, None)
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
             reminder = await service.create_reminder(
                 creator_id=message.from_user.id if message.from_user else 0,
                 type=ReminderType(data["type"]),
@@ -169,11 +169,9 @@ def create_router() -> Router:
     async def my_reminders(message: Message) -> None:
         if not message.from_user:
             return
-        async with get_session() as session:
-            from sqlalchemy import select
-            stmt = select(Reminder).where(Reminder.creator_id == message.from_user.id).order_by(Reminder.id.desc())
-            result = await session.execute(stmt)
-            reminders = result.scalars().all()
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
+            reminders = await service.get_user_reminders(message.from_user.id)
         if not reminders:
             await message.answer(
                 "Нет напоминаний",
@@ -206,10 +204,9 @@ def create_router() -> Router:
         if not callback.data:
             return
         reminder_id = int(callback.data.split(":")[-1])
-        async with get_session() as session:
-            from sqlalchemy import delete as sqla_delete
-            await session.execute(sqla_delete(Reminder).where(Reminder.id == reminder_id))
-            await session.commit()
+        async with UnitOfWork() as uow:
+            service = ReminderService(uow)
+            await service.cancel_reminder(reminder_id)
         if callback.message:
             await callback.message.edit_text("✅ Напоминание удалено")  # type: ignore[union-attr]
         await callback.answer()
@@ -224,8 +221,8 @@ def create_router() -> Router:
     async def broadcasts(message: Message, state: FSMContext) -> None:
         if not message.from_user:
             return
-        async with get_session() as session:
-            service = SubscriptionService(session)
+        async with UnitOfWork() as uow:
+            service = SubscriptionService(uow)
             sub = await service.get_subscriber(message.from_user.id)
             if not sub or not sub.is_active:
                 await message.answer(
@@ -234,14 +231,14 @@ def create_router() -> Router:
                 )
                 return
         await message.answer("Введите текст рассылки:")
-        await state.set_state("broadcast:text")
+        await state.set_state("broadcast.text")
 
-    @router.message(F.state == "broadcast:text")
+    @router.message(F.state == "broadcast.text")
     async def broadcast_text(message: Message, state: FSMContext) -> None:
         if not message.text:
             return
-        async with get_session() as session:
-            service = BroadcastService(session, None)
+        async with UnitOfWork() as uow:
+            service = BroadcastService(uow)
             broadcast = await service.create_broadcast(message.text, segment="active")
             await service.send_broadcast(broadcast.id)
         await state.clear()
@@ -282,8 +279,8 @@ def create_router() -> Router:
     @router.message(F.text == "📊 Статистика")
     async def admin_stats(message: Message) -> None:
         from src.admin.service import AdminService
-        async with get_session() as session:
-            service = AdminService(session)
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
             stats = await service.stats()
         await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
 
@@ -291,8 +288,8 @@ def create_router() -> Router:
     @router.message(F.text == "👥 Подписчики")
     async def admin_subscribers(message: Message) -> None:
         from src.admin.service import AdminService
-        async with get_session() as session:
-            service = AdminService(session)
+        async with UnitOfWork() as uow:
+            service = AdminService(uow)
             subs = await service.subscribers()
         lines = [f"{s.user_id} @{escape(s.username or '-')} {escape(s.name or '')}" for s in subs[:50]]
         await message.answer("\n".join(lines) or "Нет подписчиков")
