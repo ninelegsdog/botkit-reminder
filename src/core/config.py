@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    sentry_dsn: str = ""
+
     @property
     def admin_ids(self) -> list[int]:
         return [int(x.strip()) for x in self.telegram_admin_ids.split(",") if x.strip()]

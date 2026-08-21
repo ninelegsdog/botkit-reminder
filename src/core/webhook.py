@@ -5,18 +5,52 @@ from typing import Any
 
 from aiogram.types import Update
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.openapi.utils import get_openapi
+from sqlalchemy import text
 
 from src.core.bot_factory import state
 from src.core.config import settings
 from src.core.metrics import WEBHOOK_REQUESTS
 
-app = FastAPI()
+app = FastAPI(
+    title="BotKit Reminder API",
+    description="Telegram bot webhook API for reminders and newsletters",
+    version="0.2.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 _webhook_dispatcher: Any = None
 
 
 def set_webhook_dispatcher(dispatcher: Any) -> None:
     global _webhook_dispatcher
     _webhook_dispatcher = dispatcher
+
+
+def custom_openapi() -> dict[str, Any]:
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "TelegramWebhookSecret": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Telegram-Bot-Api-Secret-Token",
+        }
+    }
+    for path in openapi_schema["paths"].values():
+        for method in path.values():
+            method["security"] = [{"TelegramWebhookSecret": []}]
+    app.openapi_schema = openapi_schema
+    return openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
 @app.get("/health")
@@ -31,7 +65,13 @@ async def healthz() -> dict[str, str]:
 
 @app.get("/readyz")
 async def readyz() -> dict[str, str]:
-    return {"status": "ready"}
+    try:
+        from src.core.database import async_session
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ready"}
+    except Exception:
+        return {"status": "not ready"}
 
 
 @app.get("/metrics")

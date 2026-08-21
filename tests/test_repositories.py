@@ -44,7 +44,6 @@ async def test_uow_rollback_on_exception(session_factory: Any) -> None:
             async with uow:
                 uow.session.add(Subscriber(user_id=1, username="test", name="Test"))
                 raise RuntimeError("fail")
-        # UoW doesn't own session, so we need to rollback manually
         await session.rollback()
         result = await session.get(Subscriber, 1)
         assert result is None

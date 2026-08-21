@@ -2,22 +2,28 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import signal
+import sys
 from contextlib import asynccontextmanager, suppress
+from typing import Any
 
 from fastapi import FastAPI
 
 from src.core.bot_factory import state
+from src.core.cache import cache
 from src.core.commands import set_commands
 from src.core.config import settings
 from src.core.errors import register_error_handler
 from src.core.logging import configure_logging
 from src.core.metrics import start_metrics
+from src.core.sentry import init_sentry
 from src.core.webhook import app as webhook_app
 from src.core.webhook import set_webhook_dispatcher
 from src.reminder import register_routers
 from src.reminder.scheduler import Scheduler
 
 configure_logging()
+init_sentry()
 logger = logging.getLogger(__name__)
 
 
@@ -51,6 +57,7 @@ async def _run_webhook() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from src.core.database import async_session
+    await cache.init()
     scheduler = Scheduler(async_session, state.bot.send_message)
     scheduler.start()
     await _run_webhook()
@@ -69,14 +76,31 @@ def create_app() -> FastAPI:
 
 
 async def main() -> None:
-    import sys
+    stop_event = asyncio.Event()
+    
+    def handle_signal(sig: int, frame: Any) -> None:
+        logger.info("Received signal %s, shutting down...", sig)
+        stop_event.set()
+    
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
     if "--webhook" in sys.argv:
         await _run_webhook()
-        stop_event = asyncio.Event()
         with suppress(asyncio.CancelledError):
             await stop_event.wait()
     else:
-        await _run_polling()
+        _setup_dp()
+        await state.bot.delete_webhook(drop_pending_updates=True)
+        await set_commands(state.bot)
+        from src.core.database import async_session
+        scheduler = Scheduler(async_session, state.bot.send_message)
+        scheduler.start()
+        logger.info("Starting polling")
+        try:
+            await state.dp.start_polling(state.bot)
+        finally:
+            scheduler.stop()
 
 
 if __name__ == "__main__":
