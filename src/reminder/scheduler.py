@@ -4,6 +4,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,12 @@ class Scheduler:
     ) -> None:
         self._session_factory = session_factory
         self._send_callback = send_callback
-        self._scheduler = AsyncIOScheduler()
+        self._scheduler = AsyncIOScheduler(
+            jobstores={
+                "default": SQLAlchemyJobStore(url=settings.database_url),
+            },
+            timezone=settings.tz,
+        )
 
     def start(self) -> None:
         self._scheduler.add_job(
@@ -32,11 +38,16 @@ class Scheduler:
             seconds=settings.scheduler_interval_seconds,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=settings.scheduler_interval_seconds * 2,
+            id="scheduler_tick",
+            replace_existing=True,
         )
         self._scheduler.start()
+        logger.info("Scheduler started with persistent job store")
 
     async def stop(self) -> None:
         self._scheduler.shutdown(wait=True)
+        logger.info("Scheduler stopped")
 
     async def _tick(self) -> None:
         try:

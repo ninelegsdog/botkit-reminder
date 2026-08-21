@@ -8,17 +8,20 @@ from fastapi import FastAPI
 
 from src.core.bot_factory import state
 from src.core.config import settings
+from src.core.errors import register_error_handler
+from src.core.logging import configure_logging
 from src.core.metrics import start_metrics
 from src.core.webhook import app as webhook_app
 from src.reminder import register_routers
 
-logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
 def _setup_dp() -> None:
     from src.core.throttling import ThrottlingMiddleware
     state.dp.message.middleware(ThrottlingMiddleware())
+    register_error_handler(state.dp)
     register_routers(state)
 
 

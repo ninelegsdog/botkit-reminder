@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,12 +20,17 @@ from src.reminder.models import (
     ReminderType,
     Subscriber,
 )
+from src.reminder.repositories import BroadcastRecipientRepository, ReminderRepository, SubscriberRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ReminderService:
     def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
         self.session = session
         self.bot = bot
+        self._reminders = ReminderRepository(session)
+        self._subscribers = SubscriberRepository(session)
 
     async def create_reminder(
         self,
@@ -50,37 +58,16 @@ class ReminderService:
         return rr
 
     async def get_due_reminders(self, now: datetime) -> Sequence[Reminder]:
-        stmt = select(Reminder).where(
-            Reminder.type == ReminderType.once,
-            Reminder.status == ReminderStatus.active,
-            Reminder.is_active,
-            Reminder.fire_at != None,  # noqa: E711
-            Reminder.fire_at <= now,
-        )
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._reminders.get_due_once(now)
 
     async def get_recurring_due(self, weekday: int) -> Sequence[Reminder]:
-        stmt = select(Reminder).where(
-            Reminder.type == ReminderType.recurring,
-            Reminder.status == ReminderStatus.active,
-            Reminder.is_active,
-            Reminder.cron_day == str(weekday),
-        )
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._reminders.get_recurring_by_weekday(weekday)
 
     async def mark_done(self, reminder_id: int) -> None:
-        stmt = select(Reminder).where(Reminder.id == reminder_id)
-        result = await self.session.execute(stmt)
-        reminder = result.scalar_one_or_none()
-        if reminder:
-            reminder.status = ReminderStatus.done
+        await self._reminders.mark_done(reminder_id)
 
     async def cancel_reminder(self, reminder_id: int) -> None:
-        stmt = select(Reminder).where(Reminder.id == reminder_id)
-        result = await self.session.execute(stmt)
-        reminder = result.scalar_one_or_none()
+        reminder = await self._reminders.get_by_id(reminder_id)
         if reminder:
             reminder.status = ReminderStatus.cancelled
             reminder.is_active = False
@@ -106,11 +93,19 @@ class ReminderService:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def get_user_reminders(self, creator_id: int) -> Sequence[Reminder]:
+        return await self._reminders.get_by_creator(creator_id)
+
+    async def get_subscriber(self, user_id: int) -> Subscriber | None:
+        return await self._subscribers.get_by_user_id(user_id)
+
 
 class BroadcastService:
     def __init__(self, session: AsyncSession, bot: Bot | None = None) -> None:
         self.session = session
         self.bot = bot
+        self._recipients = BroadcastRecipientRepository(session)
+        self._subscribers = SubscriberRepository(session)
 
     async def create_broadcast(self, text: str, segment: str) -> Broadcast:
         broadcast = Broadcast(text=text, segment=segment)
@@ -125,7 +120,7 @@ class BroadcastService:
         if not broadcast:
             return
 
-        subscribers = await self._get_subscribers(broadcast.segment)
+        subscribers = await self._subscribers.get_active(broadcast.segment)
         total = 0
         delivered = 0
         failed = 0
@@ -142,7 +137,7 @@ class BroadcastService:
                 continue
             try:
                 if self.bot:
-                    await self.bot.send_message(sub.user_id, broadcast.text)
+                    await self._send_with_retry(self.bot, sub.user_id, broadcast.text)
                 recipient.status = BroadcastStatus.delivered
                 recipient.delivered_at = datetime.now(UTC)
                 delivered += 1
@@ -157,12 +152,20 @@ class BroadcastService:
         broadcast.sent_at = datetime.now(UTC)
         await self.session.flush()
 
-    async def _get_subscribers(self, segment: str) -> Sequence[Subscriber]:
-        stmt = select(Subscriber).where(Subscriber.is_active)
-        if segment == "active":
-            pass
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+    async def _send_with_retry(self, bot: Any, user_id: int, text: str, max_retries: int = 3) -> None:
+        import asyncio
+
+        for attempt in range(max_retries):
+            try:
+                await bot.send_message(user_id, text)
+                return
+            except TelegramRetryAfter as exc:
+                logger.warning("Flood control for user %s, retry in %s sec", user_id, exc.retry_after)
+                await asyncio.sleep(exc.retry_after)
+            except TelegramNetworkError as exc:
+                logger.warning("Network error for user %s, attempt %s: %s", user_id, attempt + 1, exc)
+                await asyncio.sleep(2 ** attempt)
+        raise RuntimeError(f"Failed to send broadcast to user {user_id} after {max_retries} retries")
 
 
 class SubscriptionService:
