@@ -36,5 +36,8 @@ def capture_exception(exc: BaseException, context: dict[str, Any] | None = None)
         sentry_sdk.capture_exception(exc)
 
 
-def capture_message(message: str, level: Literal["fatal", "critical", "error", "warning", "info", "debug"] = "info") -> None:
+def capture_message(
+    message: str,
+    level: Literal["fatal", "critical", "error", "warning", "info", "debug"] = "info",
+) -> None:
     sentry_sdk.capture_message(message, level=level)

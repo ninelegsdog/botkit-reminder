@@ -58,7 +58,6 @@ strict = true
 python_version = "3.12"
 plugins = ["pydantic.mypy"]
 ignore_missing_imports = true
-exclude = ["src/app.py", "src/bot.py", "src/core/storage.py", "src/scheduler/.*"]
 
 [[tool.mypy.overrides]]
 module = "aiogram.*"
