@@ -8,12 +8,15 @@ from src.core.config import Settings
 
 
 def test_settings_defaults() -> None:
+    import os
+
     with patch.dict("os.environ", {
         "TELEGRAM_BOT_TOKEN": "123:ABC",
         "TELEGRAM_WEBHOOK_SECRET": "secret",
         "TELEGRAM_ADMIN_IDS": "1",
         "ADMIN_PASSWORD_HASH": "hash",
     }):
+        os.environ.pop("DATABASE_URL", None)
         settings = Settings()
         assert settings.database_url == "sqlite+aiosqlite:///./data/reminder.db"
         assert settings.redis_url == "redis://localhost:6379/0"
