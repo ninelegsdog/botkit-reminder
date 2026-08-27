@@ -60,14 +60,25 @@ class Scheduler:
         self._scheduler.shutdown(wait=True)
         logger.info("Scheduler stopped")
 
-async def scheduler_tick() -> None:
+    async def _tick(self) -> None:
+        await scheduler_tick(self._session_factory, self._send_callback)
+
+
+async def scheduler_tick(
+    session_factory: Any = None,
+    send_callback: Any = None,
+) -> None:
     SCHEDULER_TICKS.labels(status="started").inc()
     try:
-        from src.core.database import async_session
         from src.core.bot_factory import state
+        from src.core.database import async_session
 
-        send_callback = state.bot.send_message
-        async with async_session() as session:
+        if send_callback is None:
+            send_callback = state.bot.send_message
+        if session_factory is None:
+            session_factory = async_session
+
+        async with session_factory() as session:
             now = datetime.now(UTC)
             weekday = now.weekday()
 
@@ -124,10 +135,10 @@ class ReminderRepository:
         self._uow = uow
 
     @property
-    def _session(self):
+    def _session(self) -> Any:
         return self._uow.session
 
-    async def get_due_once_with_recipients(self, now: datetime):
+    async def get_due_once_with_recipients(self, now: datetime) -> Any:
         stmt = (
             select(Reminder)
             .where(
@@ -142,7 +153,7 @@ class ReminderRepository:
         result = await self._session.execute(stmt)
         return result.scalars().all()
 
-    async def get_recurring_by_weekday_with_recipients(self, weekday: int):
+    async def get_recurring_by_weekday_with_recipients(self, weekday: int) -> Any:
         stmt = (
             select(Reminder)
             .where(

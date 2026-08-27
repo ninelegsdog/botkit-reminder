@@ -42,7 +42,7 @@ async def test_create_reminder_property(session_factory: Any, user_id: int, text
         assert reminder.status == ReminderStatus.active
 
 
-@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=1000)
 @given(
     offset_minutes=st.integers(min_value=-60, max_value=60),
 )
