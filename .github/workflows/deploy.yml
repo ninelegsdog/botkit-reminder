@@ -24,7 +24,7 @@ jobs:
       - name: Test
         run: pytest
       - name: Deploy to Render
-        uses: JorgeLNJunior/render-deploy@v1.0.0
+        uses: JorgeLNJunior/render-deploy@1.0.0
         with:
           service-id: ${{ secrets.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
