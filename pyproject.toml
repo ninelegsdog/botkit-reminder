@@ -11,6 +11,7 @@ authors = [
 dependencies = [
     "aiogram>=3.30",
     "aiosqlite>=0.20",
+    "asyncpg>=0.29",
     "sqlalchemy[asyncio]>=2.0",
     "alembic>=1.13",
     "redis>=5.0",
