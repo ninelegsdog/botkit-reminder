@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def _setup_dp() -> None:
     from src.core.throttling import ThrottlingMiddleware
-    state.dp.message.middleware(ThrottlingMiddleware())
+    state.dp.message.middleware(ThrottlingMiddleware(redis_url=settings.redis_url))
     register_error_handler(state.dp)
     register_routers(state)
     set_webhook_dispatcher(state.dp)
@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
     scheduler = Scheduler(async_session, state.bot.send_message)
     scheduler.start()
     await _run_webhook()
-    start_metrics(9090)
+    start_metrics(settings.metrics_port)
     try:
         yield
     finally:
@@ -93,7 +93,11 @@ async def main() -> None:
         _setup_dp()
         await state.bot.delete_webhook(drop_pending_updates=True)
         await set_commands(state.bot)
-        from src.core.database import async_session
+        from src.core.database import Base, async_session, engine
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        start_metrics(settings.metrics_port)
         scheduler = Scheduler(async_session, state.bot.send_message)
         scheduler.start()
         logger.info("Starting polling")

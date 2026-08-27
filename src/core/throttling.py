@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import time
-from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import redis.asyncio as redis
 from aiogram import types
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 
-_THROTTLE: dict[str, dict[int, float]] = defaultdict(dict)
-_RATE_LIMIT = 0.5
-
 
 class ThrottlingMiddleware(BaseMiddleware):
+    def __init__(self, redis_url: str, rate_limit: float = 0.5) -> None:
+        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self._rate_limit = rate_limit
+
     async def __call__(
         self,
         handler: Callable[..., Awaitable[Any]],
@@ -23,10 +24,13 @@ class ThrottlingMiddleware(BaseMiddleware):
         if not user:
             return await handler(event, **data)
 
-        key = f"{handler.__name__}:{user.id}"
+        key = f"throttle:{handler.__name__}:{user.id}"
         now = time.time()
-        last = _THROTTLE[key].get(user.id, 0)
-        if now - last < _RATE_LIMIT:
-            return
-        _THROTTLE[key][user.id] = now
+        try:
+            last = await self._redis.get(key)
+            if last and now - float(last) < self._rate_limit:
+                return
+            await self._redis.set(key, str(now), ex=int(self._rate_limit * 2))
+        except Exception:
+            pass  # Don't fail on Redis errors
         return await handler(event, **data)

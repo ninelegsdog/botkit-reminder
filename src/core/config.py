@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     scheduler_interval_seconds: int = 30
 
+    metrics_port: int = 9090
+
     yookassa_shop_id: str = ""
     yookassa_secret_key: str = ""
     telegram_stars_provider_enabled: bool = True
