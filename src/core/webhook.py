@@ -53,7 +53,7 @@ def custom_openapi() -> dict[str, Any]:
 app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
-@app.get("/health")
+@app.get("/health", response_model=None)
 async def health() -> dict[str, str] | Response:
     try:
         from src.core.database import async_session
