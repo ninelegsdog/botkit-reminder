@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.types import Message
 
 from src.admin.service import AdminService
@@ -24,7 +24,7 @@ def create_router() -> Router:
         await message.answer("Введите пароль:")
         await state.set_state("admin:password")
 
-    @router.message(F.state == "admin:password")
+    @router.message(StateFilter("admin:password"))
     async def admin_password(message: Message, state: Any) -> None:
         from src.core.auth import admin_gate, verify_password
         if not message.from_user or not message.text:
@@ -43,16 +43,16 @@ def create_router() -> Router:
         else:
             await message.answer("❌ Неверный пароль")
 
-    @admin_only
     @router.message(F.text == "📊 Статистика")
+    @admin_only
     async def admin_stats(message: Message) -> None:
         async with UnitOfWork() as uow:
             service = AdminService(uow)
             stats = await service.stats()
         await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
 
-    @admin_only
     @router.message(F.text == "👥 Подписчики")
+    @admin_only
     async def admin_subscribers(message: Message) -> None:
         async with UnitOfWork() as uow:
             service = AdminService(uow)

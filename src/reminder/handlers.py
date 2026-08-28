@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -93,8 +93,8 @@ def create_router() -> Router:
     async def once_type(callback: CallbackQuery, state: FSMContext) -> None:
         await state.update_data(type=ReminderType.once.value)
         if callback.message:
-            await callback.message.edit_text("Введите дату в формате ДД.ММ.ГГГГ")  # type: ignore[union-attr]
-        await state.set_state("reminder:date")
+            await callback.message.edit_text("Введите текст напоминания:")  # type: ignore[union-attr]
+        await state.set_state("reminder:text")
 
     @router.callback_query(F.data == "rem:type:recurring")
     async def recurring_type(callback: CallbackQuery, state: FSMContext) -> None:
@@ -112,23 +112,36 @@ def create_router() -> Router:
         day = callback.data.split(":")[-1]  # type: ignore[union-attr]
         await state.update_data(cron_day=day)
         if callback.message:
-            await callback.message.edit_text("Введите время ЧЧ:ММ")  # type: ignore[union-attr]
-        await state.set_state("reminder:time")
+            await callback.message.edit_text("Введите текст напоминания:")  # type: ignore[union-attr]
+        await state.set_state("reminder:text")
 
-    @router.message(F.state == "reminder:date")
+    @router.message(StateFilter("reminder:text"))
+    async def text_entered(message: Message, state: FSMContext) -> None:
+        if not message.text:
+            return
+        await state.update_data(text=message.text.strip())
+        data = await state.get_data()
+        if data.get("type") == ReminderType.recurring.value:
+            await message.answer("Введите время ЧЧ:ММ")
+            await state.set_state("reminder:time")
+        else:
+            await message.answer("Введите дату в формате ДД.ММ.ГГГГ")
+            await state.set_state("reminder:date")
+
+    @router.message(StateFilter("reminder:date"))
     async def date_entered(message: Message, state: FSMContext) -> None:
         if not message.text:
             return
         try:
-            fire_at = datetime.strptime(message.text.strip(), "%d.%m.%Y")
+            day = datetime.strptime(message.text.strip(), "%d.%m.%Y")
         except ValueError:
             await message.answer("Неверный формат. Введите ДД.ММ.ГГГГ")
             return
-        await state.update_data(fire_at=fire_at.date().isoformat())
+        await state.update_data(fire_at=day.date().isoformat())
         await message.answer("Введите время ЧЧ:ММ")
         await state.set_state("reminder:time")
 
-    @router.message(F.state == "reminder:time")
+    @router.message(StateFilter("reminder:time"))
     async def time_entered(message: Message, state: FSMContext) -> None:
         if not message.text:
             return
@@ -138,22 +151,31 @@ def create_router() -> Router:
             await message.answer("Неверный формат. Введите ЧЧ:ММ")
             return
         data = await state.get_data()
-        fire_at_str = data.get("fire_at")
-        if fire_at_str:
-            fire_at = datetime.fromisoformat(fire_at_str).replace(hour=h, minute=m)
-        else:
-            await message.answer("Сначала выберите тип и параметры")
+        text = data.get("text")
+        if not text:
+            await message.answer("Сначала введите текст напоминания")
             await state.clear()
             return
-        text = data.get("text") or message.text
+        reminder_type = ReminderType(data["type"])
+        if reminder_type == ReminderType.once:
+            fire_at_str = data.get("fire_at")
+            if not fire_at_str:
+                await message.answer("Сначала выберите дату")
+                await state.clear()
+                return
+            fire_at = datetime.fromisoformat(fire_at_str).replace(hour=h, minute=m, tzinfo=UTC)
+            cron_day = None
+        else:
+            fire_at = datetime(2000, 1, 1, h, m, tzinfo=UTC)
+            cron_day = data.get("cron_day")
         async with UnitOfWork() as uow:
             service = ReminderService(uow)
             reminder = await service.create_reminder(
                 creator_id=message.from_user.id if message.from_user else 0,
-                type=ReminderType(data["type"]),
-                text=text or "Напоминание",
+                type=reminder_type,
+                text=text,
                 fire_at=fire_at,
-                cron_day=data.get("cron_day"),
+                cron_day=cron_day,
             )
         await state.clear()
         await message.answer(
@@ -217,23 +239,14 @@ def create_router() -> Router:
             await callback.message.edit_text("❌ Отменено")  # type: ignore[union-attr]
         await callback.answer()
 
-    @router.message(F.text == "📣 Рассылки")
+    @router.message(F.text.in_({"📣 Рассылки", "📣 Рассылка"}))
+    @admin_only
     async def broadcasts(message: Message, state: FSMContext) -> None:
-        if not message.from_user:
-            return
-        async with UnitOfWork() as uow:
-            service = SubscriptionService(uow)
-            sub = await service.get_subscriber(message.from_user.id)
-            if not sub or not sub.is_active:
-                await message.answer(
-                    "🔕 Вы не подписаны на рассылки. Подпишитесь сначала.",
-                    reply_markup=reply_menu("🔔 Подписаться", "⏰ Мои напоминания"),
-                )
-                return
         await message.answer("Введите текст рассылки:")
         await state.set_state("broadcast.text")
 
-    @router.message(F.state == "broadcast.text")
+    @router.message(StateFilter("broadcast.text"))
+    @admin_only
     async def broadcast_text(message: Message, state: FSMContext) -> None:
         if not message.text:
             return
@@ -256,7 +269,7 @@ def create_router() -> Router:
         await message.answer("Введите пароль:")
         await state.set_state("admin:password")
 
-    @router.message(F.state == "admin:password")
+    @router.message(StateFilter("admin:password"))
     async def admin_password(message: Message, state: FSMContext) -> None:
         from src.core.auth import admin_gate, verify_password
         if not message.from_user or not message.text:

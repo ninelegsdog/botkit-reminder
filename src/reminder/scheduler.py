@@ -24,6 +24,10 @@ from src.reminder.service import ReminderService
 
 logger = logging.getLogger(__name__)
 
+# Guards recurring reminders against per-tick spam: at most one send per
+# (reminder, calendar-minute). Process-local; resets on restart (rare dup).
+_RECURRING_SENT_MINUTE: dict[int, str] = {}
+
 
 class Scheduler:
     def __init__(
@@ -105,6 +109,14 @@ async def scheduler_tick(
                 await service.mark_done(reminder.id)
 
             for reminder in due_recurring:
+                if not reminder.fire_at:
+                    continue
+                if (now.hour, now.minute) != (reminder.fire_at.hour, reminder.fire_at.minute):
+                    continue
+                minute_key = f"{now.date().isoformat()}-{now.hour:02d}-{now.minute:02d}"
+                if _RECURRING_SENT_MINUTE.get(reminder.id) == minute_key:
+                    continue
+                _RECURRING_SENT_MINUTE[reminder.id] = minute_key
                 recipients = [r.user_id for r in reminder.recipients]
                 if reminder.creator_id not in recipients:
                     recipients.append(reminder.creator_id)
@@ -160,6 +172,7 @@ class ReminderRepository:
                 Reminder.type == ReminderType.recurring,
                 Reminder.status == ReminderStatus.active,
                 Reminder.is_active,
+                Reminder.fire_at != None,  # noqa: E711
                 Reminder.cron_day == str(weekday),
             )
             .options(selectinload(Reminder.recipients))
