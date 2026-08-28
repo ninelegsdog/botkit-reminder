@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,7 +33,16 @@ class Settings(BaseSettings):
 
     @property
     def admin_ids(self) -> list[int]:
-        return [int(x.strip()) for x in self.telegram_admin_ids.split(",") if x.strip()]
+        result: list[int] = []
+        for token in self.telegram_admin_ids.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                result.append(int(token))
+            except ValueError:
+                logging.warning("Invalid admin id ignored: %r", token)
+        return result
 
     def validate_on_startup(self) -> None:
         if not self.telegram_bot_token or ":" not in self.telegram_bot_token:

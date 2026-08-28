@@ -83,11 +83,12 @@ async def metrics() -> Response:
 @app.post("/webhook/{bot_token}")
 async def telegram_webhook(bot_token: str, request: Request) -> dict[str, str | bool]:
     WEBHOOK_REQUESTS.labels(status="received").inc()
-    if settings.telegram_webhook_secret and settings.telegram_webhook_secret != "change-me":
-        secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-        if not secret or not hmac.compare_digest(secret, settings.telegram_webhook_secret):
-            WEBHOOK_REQUESTS.labels(status="forbidden").inc()
-            raise HTTPException(status_code=403, detail="Forbidden")
+    if not settings.telegram_webhook_secret or settings.telegram_webhook_secret == "change-me":
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    if not secret or not hmac.compare_digest(secret, settings.telegram_webhook_secret):
+        WEBHOOK_REQUESTS.labels(status="forbidden").inc()
+        raise HTTPException(status_code=403, detail="Forbidden")
     if bot_token != settings.telegram_bot_token.split(":")[0]:
         WEBHOOK_REQUESTS.labels(status="forbidden").inc()
         raise HTTPException(status_code=403, detail="Forbidden")
