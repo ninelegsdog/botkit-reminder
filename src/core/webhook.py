@@ -54,8 +54,15 @@ app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, str] | Response:
+    try:
+        from src.core.database import async_session
+
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception:
+        return Response(status_code=500, content="db unavailable")
 
 
 @app.get("/healthz")
