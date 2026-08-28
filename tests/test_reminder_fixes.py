@@ -142,6 +142,46 @@ async def test_recurring_not_sent_off_time(session_factory: Any) -> None:
     assert len(sent) == 0
 
 
+# --- Bug 4: full e2e broadcast gate with REAL admin password ---
+# conftest ADMIN_PASSWORD_HASH = sha256("admin")
+@pytest.mark.asyncio
+async def test_broadcast_e2e_with_real_password(app_state: Any, mock_uow: Any) -> None:
+    admin_gate.logout(1)
+    bot = Bot(token="123:ABC")
+    app_state.bot = bot
+    register_routers(app_state)
+    with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=AsyncMock(status=200)), \
+         patch("src.reminder.handlers.UnitOfWork", return_value=mock_uow), \
+         patch("src.admin.handlers.UnitOfWork", return_value=mock_uow):
+        # 1) open admin session
+        await app_state.dp.feed_update(bot, Update(update_id=1, message=_msg("/admin", 1)))
+        # 2) authenticate with the real password
+        await app_state.dp.feed_update(bot, Update(update_id=2, message=_msg("admin", 2)))
+        # 3) non-admin would be blocked here; as admin we reach the prompt
+        await app_state.dp.feed_update(bot, Update(update_id=3, message=_msg("📣 Рассылка", 3)))
+        # 4) send the broadcast text -> creates a broadcast row
+        await app_state.dp.feed_update(bot, Update(update_id=4, message=_msg("E2E broadcast body", 4)))
+    assert mock_uow.session.add.called
+    added = mock_uow.session.add.call_args.args[0]
+    assert added.text == "E2E broadcast body"
+
+
+@pytest.mark.asyncio
+async def test_broadcast_e2e_wrong_password_blocked(app_state: Any, mock_uow: Any) -> None:
+    admin_gate.logout(1)
+    bot = Bot(token="123:ABC")
+    app_state.bot = bot
+    register_routers(app_state)
+    with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=AsyncMock(status=200)), \
+         patch("src.reminder.handlers.UnitOfWork", return_value=mock_uow), \
+         patch("src.admin.handlers.UnitOfWork", return_value=mock_uow):
+        await app_state.dp.feed_update(bot, Update(update_id=1, message=_msg("/admin", 1)))
+        await app_state.dp.feed_update(bot, Update(update_id=2, message=_msg("wrong-pass", 2)))
+        await app_state.dp.feed_update(bot, Update(update_id=3, message=_msg("📣 Рассылка", 3)))
+    # wrong password -> admin session NOT opened -> broadcast never created
+    assert not mock_uow.session.add.called
+
+
 # --- Bug 3: "Add" flow must collect reminder text ---
 @pytest.mark.asyncio
 async def test_add_once_flow_creates_reminder(app_state: Any, mock_uow: Any) -> None:
