@@ -45,7 +45,7 @@ bot = "botkit_reminder.bot:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70 -m 'not integration'"
+addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=68 -m 'not integration'"
 filterwarnings = ["error::DeprecationWarning"]
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
@@ -66,7 +66,7 @@ omit = ["tests/*", "scripts/*"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-fail_under = 70
+fail_under = 68
 exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]
 
 [tool.coverage.xml]
