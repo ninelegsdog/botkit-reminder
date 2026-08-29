@@ -22,7 +22,7 @@ def test_settings_defaults() -> None:
         assert settings.redis_url == "redis://localhost:6379/0"
         assert settings.tz == "Europe/Moscow"
         assert settings.scheduler_interval_seconds == 30
-        assert settings.admin_ids == [1]
+        assert settings.admin_ids_list == [1]
 
 
 def test_settings_validation() -> None:
