@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str
     telegram_webhook_secret: str
     telegram_admin_ids: str
-    admin_password_hash: str
+    admin_password: str
 
     database_url: str = "sqlite+aiosqlite:///./data/reminder.db"
     redis_url: str = "redis://localhost:6379/0"
@@ -44,6 +45,10 @@ class Settings(BaseSettings):
                 logging.warning("Invalid admin id ignored: %r", token)
         return result
 
+    @property
+    def admin_password_hash(self) -> str:
+        return hashlib.sha256(self.admin_password.encode("utf-8")).hexdigest()
+
     def validate_on_startup(self) -> None:
         if not self.telegram_bot_token or ":" not in self.telegram_bot_token:
             raise RuntimeError("TELEGRAM_BOT_TOKEN is invalid")
@@ -51,8 +56,8 @@ class Settings(BaseSettings):
             raise RuntimeError("TELEGRAM_WEBHOOK_SECRET must be changed from default")
         if not self.admin_ids:
             raise RuntimeError("TELEGRAM_ADMIN_IDS is empty")
-        if not self.admin_password_hash:
-            raise RuntimeError("ADMIN_PASSWORD_HASH is not set")
+        if not self.admin_password:
+            raise RuntimeError("ADMIN_PASSWORD is not set")
         if self.scheduler_interval_seconds <= 0:
             raise RuntimeError("SCHEDULER_INTERVAL_SECONDS must be positive")
 

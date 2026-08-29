@@ -14,8 +14,8 @@ F = TypeVar("F", bound=Callable[..., Awaitable[None]])
 
 
 def verify_password(password: str) -> bool:
-    if not settings.admin_password_hash:
-        raise RuntimeError("ADMIN_PASSWORD_HASH is not configured")
+    if not settings.admin_password:
+        raise RuntimeError("ADMIN_PASSWORD is not configured")
     return hmac.compare_digest(
         hashlib.sha256(password.encode()).hexdigest(),
         settings.admin_password_hash,
