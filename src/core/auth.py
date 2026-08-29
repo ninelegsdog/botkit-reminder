@@ -14,10 +14,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[None]])
 
 
 def verify_password(password: str) -> bool:
-    if settings.admin_password:
-        expected = settings.admin_password_hash
-    else:
-        expected = hashlib.sha256(b"admin").hexdigest()
+    expected = settings.admin_password_hash if settings.admin_password else hashlib.sha256(b"admin").hexdigest()
     return hmac.compare_digest(
         hashlib.sha256(password.encode()).hexdigest(),
         expected,
