@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str
     telegram_webhook_secret: str
     telegram_admin_ids: str
-    admin_password: str
+    admin_password: str = ""
 
     database_url: str = "sqlite+aiosqlite:///./data/reminder.db"
     redis_url: str = "redis://localhost:6379/0"
