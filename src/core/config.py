@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str
     telegram_webhook_secret: str
-    telegram_admin_ids: str
+    admin_ids: str
     admin_password: str = ""
 
     database_url: str = "sqlite+aiosqlite:///./data/reminder.db"
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     @property
     def admin_ids(self) -> list[int]:
         result: list[int] = []
-        for token in self.telegram_admin_ids.split(","):
+        for token in self.admin_ids.split(","):
             token = token.strip()
             if not token:
                 continue
