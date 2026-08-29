@@ -17,7 +17,7 @@ def test_settings_defaults() -> None:
         "ADMIN_PASSWORD_HASH": "hash",
     }):
         os.environ.pop("DATABASE_URL", None)
-        settings = Settings()
+        settings = Settings(_env_file=None)
         assert settings.database_url == "sqlite+aiosqlite:///./data/reminder.db"
         assert settings.redis_url == "redis://localhost:6379/0"
         assert settings.tz == "Europe/Moscow"
@@ -29,9 +29,9 @@ def test_settings_validation() -> None:
     with patch.dict("os.environ", {
         "TELEGRAM_BOT_TOKEN": "invalid",
         "TELEGRAM_WEBHOOK_SECRET": "change-me",
-        "ADMIN_IDS": "",
-        "ADMIN_PASSWORD_HASH": "",
+        "ADMIN_IDS": "1",
+        "ADMIN_PASSWORD_HASH": "x",
         "SCHEDULER_INTERVAL_SECONDS": "0",
     }), pytest.raises(RuntimeError):
-        s = Settings()
+        s = Settings(_env_file=None)
         s.validate_on_startup()
