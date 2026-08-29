@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
 
     @property
-    def admin_ids(self) -> list[int]:
+    def admin_ids_list(self) -> list[int]:
         result: list[int] = []
         for token in self.admin_ids.split(","):
             token = token.strip()

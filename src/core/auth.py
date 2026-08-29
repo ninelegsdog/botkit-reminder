@@ -22,7 +22,7 @@ def verify_password(password: str) -> bool:
 
 
 def is_admin(user_id: int) -> bool:
-    return user_id in settings.admin_ids
+    return user_id in settings.admin_ids_list
 
 
 class AdminGate:

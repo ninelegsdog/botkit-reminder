@@ -13,7 +13,7 @@ def test_settings_defaults() -> None:
     with patch.dict("os.environ", {
         "TELEGRAM_BOT_TOKEN": "123:ABC",
         "TELEGRAM_WEBHOOK_SECRET": "secret",
-        "TELEGRAM_ADMIN_IDS": "1",
+        "ADMIN_IDS": "1",
         "ADMIN_PASSWORD_HASH": "hash",
     }):
         os.environ.pop("DATABASE_URL", None)
@@ -29,7 +29,7 @@ def test_settings_validation() -> None:
     with patch.dict("os.environ", {
         "TELEGRAM_BOT_TOKEN": "invalid",
         "TELEGRAM_WEBHOOK_SECRET": "change-me",
-        "TELEGRAM_ADMIN_IDS": "",
+        "ADMIN_IDS": "",
         "ADMIN_PASSWORD_HASH": "",
         "SCHEDULER_INTERVAL_SECONDS": "0",
     }), pytest.raises(RuntimeError):
