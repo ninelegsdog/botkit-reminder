@@ -4,11 +4,15 @@ import sqlite3
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.ext.asyncio import async_sessionmaker as AsyncSessionMaker
+from sqlalchemy.orm import DeclarativeBase
 
 from src.core.config import settings
 
@@ -24,7 +28,7 @@ class Database:
 
     @property
     def async_session(self) -> AsyncSessionMaker[AsyncSession]:
-        return self._session_factory
+        return self._session_factory  # type: ignore[return-value]
 
     @property
     def engine(self) -> AsyncEngine:
