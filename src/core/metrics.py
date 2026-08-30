@@ -114,7 +114,7 @@ async def start_metrics_server(port: int) -> web.AppRunner:
 def start_metrics(port: int = 9090) -> None:
     # Legacy sync version for compatibility
     import threading
-    def run():
+    def run() -> None:
         import asyncio
         asyncio.run(start_metrics_server(port))
     threading.Thread(target=run, daemon=True).start()
