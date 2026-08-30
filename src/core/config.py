@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str
     telegram_webhook_secret: str
+    webhook_secret: str = ""
     webhook_url: str = ""
     webhook_cert_path: str = ""
     admin_ids: str
