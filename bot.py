@@ -103,7 +103,7 @@ async def _run_polling(shutdown_event: asyncio.Event) -> None:
 async def main() -> None:
     configure_logging()
     init_sentry()
-    state.config.validate()
+    settings.validate_on_startup()
     logging.basicConfig(level=settings.log_level)
 
     shutdown_event = asyncio.Event()
