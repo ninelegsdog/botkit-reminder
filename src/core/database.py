@@ -28,7 +28,7 @@ class Database:
 
     @property
     def async_session(self) -> AsyncSessionMaker[AsyncSession]:
-        return self._session_factory  # type: ignore[return-value]
+        return self._session_factory
 
     @property
     def engine(self) -> AsyncEngine:
