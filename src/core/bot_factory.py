@@ -7,6 +7,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 
 from src.core.config import settings
+from src.core.database import Database
 
 
 class AppState:
@@ -22,6 +23,7 @@ class AppState:
             except Exception:
                 self.storage = MemoryStorage()
         self.dp = Dispatcher(storage=self.storage)
+        self.db = Database(settings.database_url)
 
 
 state = AppState()

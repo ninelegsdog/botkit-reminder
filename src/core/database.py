@@ -15,6 +15,23 @@ class Base(DeclarativeBase):
     pass
 
 
+class Database:
+    def __init__(self, url: str) -> None:
+        self._engine = create_async_engine(url, echo=False)
+        self._session_factory = async_sessionmaker(self._engine, expire_on_commit=False)
+
+    @property
+    def async_session(self):
+        return self._session_factory
+
+    @property
+    def engine(self):
+        return self._engine
+
+    async def dispose(self) -> None:
+        await self._engine.dispose()
+
+
 db_path = Path(settings.database_url.replace("sqlite+aiosqlite:///", ""))
 db_path.parent.mkdir(parents=True, exist_ok=True)
 
