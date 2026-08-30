@@ -102,7 +102,7 @@ async def _run_polling(shutdown_event: asyncio.Event) -> None:
 
 async def main() -> None:
     configure_logging()
-    init_sentry(settings.sentry_dsn)
+    init_sentry()
     state.config.validate()
     logging.basicConfig(level=settings.log_level)
 
