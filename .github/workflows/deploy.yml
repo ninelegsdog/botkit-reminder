@@ -80,6 +80,8 @@ jobs:
           REDIS_URL=redis://:${{ secrets.REDIS_PASSWORD }}@redis:6379/0
           DATABASE_URL=sqlite+aiosqlite:///./data/bot.db
           DB_PATH=./data/bot.db
+          WEBHOOK_URL=https://ninelegsbots.duckdns.org/webhook/reminder
+          WEBHOOK_SECRET=${{ secrets.WEBHOOK_SECRET }}
           EOF
           scp -o StrictHostKeyChecking=no /tmp/${BOT}.env deploy@2.27.204.95:/home/deploy/${BOT}/.env
 
