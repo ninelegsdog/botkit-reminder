@@ -47,7 +47,7 @@ async def _run_webhook() -> None:
     _setup_dp()
     await set_commands(state.bot)
     webhook_base = settings.webhook_url.rstrip("/") if settings.webhook_url else "https://botkit-reminder.onrender.com"
-    webhook_path = f"/webhook/{settings.telegram_bot_token.split(':')[0]}"
+    webhook_path = "/webhook/reminder"
     full_webhook_url = f"{webhook_base}{webhook_path}"
     await state.bot.set_webhook(
         full_webhook_url,
