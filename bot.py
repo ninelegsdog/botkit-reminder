@@ -46,12 +46,14 @@ async def _run_polling() -> None:
 async def _run_webhook() -> None:
     _setup_dp()
     await set_commands(state.bot)
-    webhook_path = f"/webhook/{settings.telegram_bot_token}"
+    webhook_base = settings.webhook_url.rstrip("/") if settings.webhook_url else "https://botkit-reminder.onrender.com"
+    webhook_path = f"/webhook/{settings.telegram_bot_token.split(':')[0]}"
+    full_webhook_url = f"{webhook_base}{webhook_path}"
     await state.bot.set_webhook(
-        f"https://botkit-reminder.onrender.com{webhook_path}",
+        full_webhook_url,
         secret_token=settings.telegram_webhook_secret,
     )
-    logger.info("Webhook set to %s", webhook_path)
+    logger.info("Webhook set to %s", full_webhook_url)
 
 
 @asynccontextmanager
@@ -60,7 +62,10 @@ async def lifespan(app: FastAPI):
     await cache.init()
     scheduler = Scheduler(async_session, state.bot.send_message)
     scheduler.start()
-    await _run_webhook()
+    if settings.webhook_url:
+        await _run_webhook()
+    else:
+        logger.info("WEBHOOK_URL not set, running in polling mode (FastAPI only for health/metrics)")
     start_metrics(settings.metrics_port)
     try:
         yield
@@ -85,7 +90,7 @@ async def main() -> None:
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
     
-    if "--webhook" in sys.argv:
+    if "--webhook" in sys.argv or settings.webhook_url:
         await _run_webhook()
         with suppress(asyncio.CancelledError):
             await stop_event.wait()
