@@ -46,14 +46,14 @@ async def _run_polling() -> None:
 async def _run_webhook() -> None:
     _setup_dp()
     await set_commands(state.bot)
-    webhook_base = settings.webhook_url.rstrip("/") if settings.webhook_url else "https://botkit-reminder.onrender.com"
-    webhook_path = "/webhook/reminder"
-    full_webhook_url = f"{webhook_base}{webhook_path}"
+    if not settings.webhook_url:
+        logger.error("WEBHOOK_URL not set, cannot set webhook")
+        return
     await state.bot.set_webhook(
-        full_webhook_url,
+        settings.webhook_url,
         secret_token=settings.telegram_webhook_secret,
     )
-    logger.info("Webhook set to %s", full_webhook_url)
+    logger.info("Webhook set to %s", settings.webhook_url)
 
 
 @asynccontextmanager
