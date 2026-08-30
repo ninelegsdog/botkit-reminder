@@ -14,5 +14,5 @@ RUN mkdir -p /app/data /app/backups && chown -R appuser:appgroup /app
 USER appuser
 EXPOSE 8080
 ARG PORT
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request as u; u.urlopen('http://localhost:${PORT}/health')"
+HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8080/health')"
 CMD ["python", "bot.py"]
