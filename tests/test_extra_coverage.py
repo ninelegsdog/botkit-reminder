@@ -91,17 +91,16 @@ async def test_scheduler_error_handling(session_factory: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_metrics_attributes():
+async def test_metrics_attributes() -> None:
     m = Metrics()
     m.messages_processed = 1
-    m.status_updates = 1
-    m.notifications_sent = 1
+    m.reminders_sent = 1
     m.errors = 1
     assert m.messages_processed == 1
     assert m.uptime_seconds() >= 0
 
 @pytest.mark.asyncio
-async def test_config_settings_validation():
+async def test_config_settings_validation() -> None:
     cfg = Settings(
         telegram_bot_token="123:ABC",
         admin_password="secret",
