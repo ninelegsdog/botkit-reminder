@@ -1,3 +1,4 @@
+## Redis migration: shared Redis with DB sharding on port 6380
 from __future__ import annotations
 
 import hashlib
