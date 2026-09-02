@@ -18,6 +18,7 @@ from src.core.metrics import health, metrics, start_metrics_server
 from src.core.sentry import init_sentry
 from src.core.tgwebhook import build_webhook_app
 from src.core.throttling import ThrottlingMiddleware
+from src.core.tracing import TracingMiddleware, setup_tracing
 from src.reminder import register_routers
 from src.reminder.scheduler import Scheduler
 
@@ -31,6 +32,7 @@ def _load_cert(path: str) -> BufferedInputFile | None:
 
 def _setup_dp() -> None:
     state.dp.update.outer_middleware(LoggingMiddleware())
+    state.dp.update.outer_middleware(TracingMiddleware())
     state.dp.message.middleware(ThrottlingMiddleware(redis_url=settings.redis_url))
     register_error_handler(state.dp)
     register_routers(state)
@@ -103,6 +105,7 @@ async def _run_polling(shutdown_event: asyncio.Event) -> None:
 
 async def main() -> None:
     setup_logging(level="INFO", json=True, bot_name="reminder")
+    setup_tracing(service_name="reminder")
     init_sentry()
     settings.validate_on_startup()
     logging.basicConfig(level=settings.log_level)
