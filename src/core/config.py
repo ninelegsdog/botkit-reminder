@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     admin_password: str = ""
 
     database_url: str = "sqlite+aiosqlite:///./data/reminder.db"
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://127.0.0.1:6380/8"
 
     tz: str = "Europe/Moscow"
 

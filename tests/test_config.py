@@ -19,7 +19,7 @@ def test_settings_defaults() -> None:
         os.environ.pop("DATABASE_URL", None)
         settings = Settings(_env_file=None)
         assert settings.database_url == "sqlite+aiosqlite:///./data/reminder.db"
-        assert settings.redis_url == "redis://localhost:6379/0"
+        assert settings.redis_url == "redis://127.0.0.1:6380/8"
         assert settings.tz == "Europe/Moscow"
         assert settings.scheduler_interval_seconds == 30
         assert settings.admin_ids_list == [1]
