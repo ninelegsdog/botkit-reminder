@@ -54,7 +54,7 @@ async def session_factory(tmp_path: Any) -> Any:
 def _msg(text: str, mid: int) -> Message:
     return Message(
         message_id=mid,
-        date=datetime.now(),
+        date=datetime.now(UTC),
         chat=Chat(id=1, type="private"),
         from_user=User(id=1, is_bot=False, first_name="X"),
         text=text,

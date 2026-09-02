@@ -68,7 +68,7 @@ async def test_scheduler_error_handling(session_factory: Any) -> None:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            raise Exception("fail")
+            raise RuntimeError("test failure")
 
     scheduler = Scheduler(session_factory, send_callback)
     async with session_factory() as session:

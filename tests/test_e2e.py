@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -29,7 +29,7 @@ async def test_start_command() -> None:
         register_routers(app_state)
         message = Message(
             message_id=1,
-            date=datetime.now(),
+            date=datetime.now(UTC),
             chat=Chat(id=1, type="private"),
             from_user=User(id=1, is_bot=False, first_name="Test"),
             text="/start",
