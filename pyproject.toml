@@ -47,7 +47,7 @@ bot = "botkit_reminder.bot:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70 -m 'not integration'"
-filterwarnings = ["error::DeprecationWarning"]
+filterwarnings = ["error::DeprecationWarning", "ignore::DeprecationWarning:anyio.abc.BlockingPortal"]
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "no_req: fully offline, no external HTTP/Telegram requests",
