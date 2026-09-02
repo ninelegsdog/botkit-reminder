@@ -1,9 +1,10 @@
 """Cover src/core/tracing.py shim."""
 from __future__ import annotations
 
-import pytest
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
-from typing import Any, Awaitable, Callable, cast
+
+import pytest
 
 from src.core.tracing import (
     TracingMiddleware,
