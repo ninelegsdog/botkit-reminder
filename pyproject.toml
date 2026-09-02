@@ -53,7 +53,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:anyio.abc.BlockingPortal",
 ]
 markers = [
-    "integration: marks tests as integration tests (deselect with -m "not integration")",
+    "integration: marks tests as integration tests (deselect with -m not integration)",
     "no_req: fully offline, no external HTTP/Telegram requests",
     "req: requires network and/or a real external service (Telegram E2E, payment gateways)",
     "unit: isolated unit test",
