@@ -17,6 +17,7 @@ def test_settings_defaults() -> None:
         "ADMIN_PASSWORD_HASH": "hash",
     }):
         os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("REDIS_URL", None)
         settings = Settings(_env_file=None)
         assert settings.database_url == "sqlite+aiosqlite:///./data/reminder.db"
         assert settings.redis_url == "redis://127.0.0.1:6380/8"
