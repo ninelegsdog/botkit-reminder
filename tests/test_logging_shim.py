@@ -29,7 +29,7 @@ def test_logging_middleware_sets_conversation_id() -> None:
     class FakeEvent:
         chat = FakeChat()
 
-    async def handler(event, data):
+    async def handler(event: object, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = asyncio.run(mw(handler, FakeEvent(), {}))
@@ -46,7 +46,7 @@ def test_logging_middleware_falls_back_to_user() -> None:
     class FakeEvent:
         from_user = FakeUser()
 
-    async def handler(event, data):
+    async def handler(event: object, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = asyncio.run(mw(handler, FakeEvent(), {}))
@@ -66,7 +66,7 @@ def test_logging_middleware_falls_back_to_message() -> None:
     class FakeEvent:
         message = FakeMessage()
 
-    async def handler(event, data):
+    async def handler(event: object, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = asyncio.run(mw(handler, FakeEvent(), {}))
