@@ -13,7 +13,7 @@ from src.core.cache import cache
 from src.core.commands import set_commands
 from src.core.config import settings
 from src.core.errors import register_error_handler
-from src.core.logging import configure_logging
+from src.core.logging import LoggingMiddleware, setup_logging
 from src.core.metrics import health, metrics, start_metrics_server
 from src.core.sentry import init_sentry
 from src.core.tgwebhook import build_webhook_app
@@ -30,6 +30,7 @@ def _load_cert(path: str) -> BufferedInputFile | None:
 
 
 def _setup_dp() -> None:
+    state.dp.update.outer_middleware(LoggingMiddleware())
     state.dp.message.middleware(ThrottlingMiddleware(redis_url=settings.redis_url))
     register_error_handler(state.dp)
     register_routers(state)
@@ -101,7 +102,7 @@ async def _run_polling(shutdown_event: asyncio.Event) -> None:
 
 
 async def main() -> None:
-    configure_logging()
+    setup_logging(level="INFO", json=True, bot_name="reminder")
     init_sentry()
     settings.validate_on_startup()
     logging.basicConfig(level=settings.log_level)

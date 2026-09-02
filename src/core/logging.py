@@ -1,48 +1,48 @@
+"""Logging shim — re-exports botkit_core.logging + aiogram middleware for conversation_id."""
 from __future__ import annotations
 
-import logging
-import sys
 from typing import Any
 
-import structlog
+from botkit_core.logging import ConversationContextFilter as ConversationContextFilter
+from botkit_core.logging import get_conversation_id as get_conversation_id
+from botkit_core.logging import get_json_formatter as get_json_formatter
+from botkit_core.logging import set_bot_name as set_bot_name
+from botkit_core.logging import set_conversation_id as set_conversation_id
+from botkit_core.logging import setup_logging as setup_logging
 
-from src.core.config import settings
-
-
-def _add_service(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-    event_dict["service"] = "botkit-reminder"
-    return event_dict
-
-
-def _add_environment(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-    event_dict["environment"] = "production" if settings.telegram_bot_token else "development"
-    return event_dict
-
-
-def configure_logging() -> None:
-    structlog.configure(
-        processors=[
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            _add_service,  # type: ignore[list-item]
-            _add_environment,  # type: ignore[list-item]
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.JSONRenderer(),
-        ],
-        wrapper_class=structlog.stdlib.BoundLogger,
-        context_class=dict,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
-    root = logging.getLogger()
-    root.handlers = [handler]
-    root.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
+__all__ = [
+    "ConversationContextFilter",
+    "LoggingMiddleware",
+    "get_conversation_id",
+    "get_json_formatter",
+    "set_bot_name",
+    "set_conversation_id",
+    "setup_logging",
+]
 
 
-def get_logger(name: str) -> Any:
-    return structlog.get_logger(name)
+class LoggingMiddleware:
+    """Sets conversation_id (chat_id or user_id) per update for JSON logs."""
+
+    async def __call__(
+        self,
+        handler: Any,
+        event: Any,
+        data: dict[str, Any],
+    ) -> Any:
+        cid = "-"
+        chat = getattr(event, "chat", None)
+        if chat is not None and hasattr(chat, "id"):
+            cid = str(chat.id)
+        else:
+            user = getattr(event, "from_user", None)
+            if user is not None and hasattr(user, "id"):
+                cid = str(user.id)
+            else:
+                msg = getattr(event, "message", None)
+                if msg is not None:
+                    c2 = getattr(msg, "chat", None)
+                    if c2 is not None and hasattr(c2, "id"):
+                        cid = str(c2.id)
+        set_conversation_id(cid)
+        return await handler(event, data)
