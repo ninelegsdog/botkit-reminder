@@ -34,7 +34,7 @@ async def default_error_handler(event: TelegramObject, exc: Exception) -> None:
         logger.warning("TelegramNetworkError: %s", exc)
         return
     ERROR_HANDLER_ERRORS.labels(error_type="unhandled").inc()
-    logger.critical("Unhandled error: %s", exc, exc_info=True)
+    logger.critical("Unhandled error: %s", exc)
 
 
 def register_error_handler(dp: Any) -> None:

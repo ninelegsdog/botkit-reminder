@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ class UnitOfWork:
             raise RuntimeError("UoW is not initialized. Use 'async with uow:' context manager.")
         return self._session
 
-    async def __aenter__(self) -> UnitOfWork:
+    async def __aenter__(self) -> Self:
         if self._session is None:
             self._session = async_session()
             await self._session.__aenter__()

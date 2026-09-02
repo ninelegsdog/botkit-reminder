@@ -30,7 +30,7 @@ class ReminderRepository:
             Reminder.type == ReminderType.once,
             Reminder.status == ReminderStatus.active,
             Reminder.is_active,
-            Reminder.fire_at != None,  # noqa: E711
+            Reminder.fire_at != None,
             Reminder.fire_at <= now,
         )
         result = await self._session.execute(stmt)
