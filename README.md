@@ -45,3 +45,4 @@ docker compose up -d
 ## Лицензия
 
 MIT
+# variant A
