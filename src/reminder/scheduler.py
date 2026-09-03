@@ -157,7 +157,7 @@ class ReminderRepository:
                 Reminder.type == ReminderType.once,
                 Reminder.status == ReminderStatus.active,
                 Reminder.is_active,
-                Reminder.fire_at is not None,
+                Reminder.fire_at != None,  # noqa: E711
                 Reminder.fire_at <= now,
             )
             .options(selectinload(Reminder.recipients))
@@ -172,7 +172,7 @@ class ReminderRepository:
                 Reminder.type == ReminderType.recurring,
                 Reminder.status == ReminderStatus.active,
                 Reminder.is_active,
-                Reminder.fire_at is not None,
+                Reminder.fire_at != None,  # noqa: E711
                 Reminder.cron_day == str(weekday),
             )
             .options(selectinload(Reminder.recipients))

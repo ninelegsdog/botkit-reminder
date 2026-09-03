@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -32,7 +32,7 @@ async def postgres_session_factory() -> Any:
     return factory
 
 
-@pytest.mark.integration_test
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
     async with postgres_session_factory() as session:
@@ -52,7 +52,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
             creator_id=1,
             type=ReminderType.once,
             text="Integration test",
-            fire_at=datetime.now() + timedelta(hours=1),  # noqa: DTZ005
+            fire_at=datetime.now(UTC) + timedelta(hours=1),
             status=ReminderStatus.active,
             is_active=True,
         )
@@ -69,7 +69,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
         assert updated.status == ReminderStatus.done
 
 
-@pytest.mark.integration_test
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_redis_connection() -> None:
     import os
