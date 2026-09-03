@@ -49,6 +49,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70"
 filterwarnings = [
+    "ignore::DeprecationWarning:starlette.testclient",
     "error::DeprecationWarning",
     "ignore::DeprecationWarning:The anyio.abc.BlockingPortal alias is deprecated",
     "ignore::DeprecationWarning:anyio.abc.BlockingPortal",
