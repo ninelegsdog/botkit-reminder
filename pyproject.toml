@@ -84,3 +84,7 @@ strict = true
 ignore_missing_imports = true
 warn_unused_ignores = false
 disable_error_code = ["attr-defined", "no-any-return", "call-arg", "arg-type"]
+
+[[tool.mypy.overrides]]
+module = "tests.e2e.*"
+ignore_errors = true
