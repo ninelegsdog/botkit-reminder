@@ -46,14 +46,14 @@ bot = "botkit_reminder.bot:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70 -m not integration"
+addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70"
 filterwarnings = [
     "error::DeprecationWarning",
     "ignore::DeprecationWarning:The anyio.abc.BlockingPortal alias is deprecated",
     "ignore::DeprecationWarning:anyio.abc.BlockingPortal",
 ]
 markers = [
-    "integration: marks tests as integration tests (deselect with -m not integration)",
+    "integration_test: marks tests as integration tests (deselect with -m not integration_test)",
     "no_req: fully offline, no external HTTP/Telegram requests",
     "req: requires network and/or a real external service (Telegram E2E, payment gateways)",
     "unit: isolated unit test",
