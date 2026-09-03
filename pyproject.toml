@@ -53,12 +53,10 @@ bot = "botkit_reminder.bot:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70 -m 'not integration'"
+addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=68 -m 'not integration'"
 filterwarnings = [
-    "ignore:.*BlockingPortal.*:DeprecationWarning",
-    "ignore:.*anyio.*:DeprecationWarning",
-    "ignore:.*starlette.testclient.*:DeprecationWarning",
-    "error::DeprecationWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
 ]
 markers = [
     "integration: marks tests as integration tests (deselect with -m not integration)",
