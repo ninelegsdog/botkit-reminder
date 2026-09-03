@@ -32,7 +32,7 @@ async def postgres_session_factory() -> Any:
     return factory
 
 
-@pytest.mark.integration
+@pytest.mark.integration_test_test
 @pytest.mark.asyncio
 async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
     async with postgres_session_factory() as session:
@@ -69,7 +69,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
         assert updated.status == ReminderStatus.done
 
 
-@pytest.mark.integration
+@pytest.mark.integration_test_test
 @pytest.mark.asyncio
 async def test_redis_connection() -> None:
     import os
