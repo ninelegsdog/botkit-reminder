@@ -50,14 +50,16 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70"
 filterwarnings = [
     "ignore::DeprecationWarning:starlette.testclient",
-    "error::DeprecationWarning",
     "ignore::DeprecationWarning:The anyio.abc.BlockingPortal alias is deprecated",
     "ignore::DeprecationWarning:anyio.abc.BlockingPortal",
+    "ignore::DeprecationWarning:.*BlockingPortal.*",
+    "ignore::DeprecationWarning:.*anyio.*",
+    "error::DeprecationWarning",
 ]
 markers = [
-    "integration_test: marks tests as integration tests (deselect with -m not integration_test)",
+    "integration_test: marks tests as integration tests",
     "no_req: fully offline, no external HTTP/Telegram requests",
-    "req: requires network and/or a real external service (Telegram E2E, payment gateways)",
+    "req: requires network and/or a real external service",
     "unit: isolated unit test",
     "webhook: HTTP/webhook endpoint test",
     "e2e: real Telegram E2E via MTProto",
