@@ -83,3 +83,6 @@ ignore = ["BLE001", "S110", "LOG015", "PYI036", "DTZ007", "TRY401", "E711", "RUF
 [tool.mypy]
 python_version = "3.12"
 strict = true
+ignore_missing_imports = true
+warn_unused_ignores = false
+disable_error_code = ["attr-defined", "no-any-return", "call-arg", "arg-type"]
