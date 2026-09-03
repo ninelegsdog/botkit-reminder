@@ -73,7 +73,7 @@ omit = ["tests/*", "scripts/*", "bot.py", "src/core/tgwebhook.py"]
 
 [tool.ruff]
 line-length = 120
-ignore = ["BLE001", "E711", "S110", "LOG015", "PYI036", "DTZ007", "TRY401"]
+ignore = ["BLE001", "S110", "LOG015", "PYI036", "DTZ007", "TRY401"]
 
 [tool.mypy]
 python_version = "3.12"

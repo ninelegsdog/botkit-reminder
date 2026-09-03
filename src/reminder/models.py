@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
@@ -52,7 +52,7 @@ class Reminder(Base):
     status: Mapped[ReminderStatus] = mapped_column(
         SQLEnum(ReminderStatus), default=ReminderStatus.active, nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(), nullable=False)  # noqa: DTZ005
 
     recipients: Mapped[list[ReminderRecipient]] = relationship(
         back_populates="reminder", cascade="all, delete-orphan"
@@ -102,7 +102,7 @@ class Broadcast(Base):
     delivered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     unsubscribed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(), nullable=False)  # noqa: DTZ005
 
 
 class BroadcastRecipient(Base):
