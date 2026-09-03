@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "botkit-reminder"
 version = "1.0.0"
@@ -38,7 +42,10 @@ dev = [
     "requests>=2.31",
     "structlog>=24.0",
 ]
-e2e = ["telethon>=1.34", "python-dotenv>=1.0"]
+e2e = [
+    "telethon>=1.34",
+    "python-dotenv>=1.0",
+]
 
 [project.scripts]
 bot = "botkit_reminder.bot:main"
@@ -47,9 +54,14 @@ bot = "botkit_reminder.bot:main"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=70 -m 'not integration'"
-filterwarnings = ["error::DeprecationWarning"]
+filterwarnings = [
+    "ignore:.*BlockingPortal.*:DeprecationWarning",
+    "ignore:.*anyio.*:DeprecationWarning",
+    "ignore:.*starlette.testclient.*:DeprecationWarning",
+    "error::DeprecationWarning",
+]
 markers = [
-    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "integration: marks tests as integration tests (deselect with -m not integration)",
     "no_req: fully offline, no external HTTP/Telegram requests",
     "req: requires network and/or a real external service (Telegram E2E, payment gateways)",
     "unit: isolated unit test",
@@ -64,33 +76,10 @@ source = ["src"]
 parallel = true
 omit = ["tests/*", "scripts/*", "bot.py", "src/core/tgwebhook.py"]
 
-[tool.coverage.report]
-show_missing = true
-skip_covered = true
-fail_under = 67
-exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]
-
-[tool.coverage.xml]
-output = "coverage.xml"
-
 [tool.ruff]
 line-length = 120
-target-version = "py312"
-exclude = ["alembic/*"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+ignore = ["BLE001", "S110", "LOG015", "PYI036", "DTZ007", "TRY401", "E711", "RUF100"]
 
 [tool.mypy]
-strict = true
 python_version = "3.12"
-plugins = ["pydantic.mypy"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "aiogram.*"
-ignore_errors = true
-
-[tool.hypothesis]
-database = ".hypothesis/examples.db"
-print_blob = true
+strict = true

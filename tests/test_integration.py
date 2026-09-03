@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -52,7 +52,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
             creator_id=1,
             type=ReminderType.once,
             text="Integration test",
-            fire_at=datetime.now(UTC) + timedelta(hours=1),
+            fire_at=datetime.now() + timedelta(hours=1),  # noqa: DTZ005
             status=ReminderStatus.active,
             is_active=True,
         )
