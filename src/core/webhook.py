@@ -12,6 +12,11 @@ from src.core.bot_factory import state
 from src.core.config import settings
 from src.core.metrics import WEBHOOK_REQUESTS
 
+try:
+    from botkit_core import __version__ as _core_version
+except ImportError:
+    _core_version = "0.0.0"
+
 app = FastAPI(
     title="BotKit Reminder API",
     description="Telegram bot webhook API for reminders and newsletters",
@@ -53,6 +58,11 @@ def custom_openapi() -> dict[str, Any]:
 app.openapi = custom_openapi  # type: ignore[method-assign]
 
 
+@app.get("/version")
+async def version() -> dict[str, str]:
+    return {"version": _core_version, "service": "botkit-reminder"}
+
+
 @app.get("/health", response_model=None)
 async def health() -> dict[str, str] | Response:
     try:
@@ -60,7 +70,7 @@ async def health() -> dict[str, str] | Response:
 
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
-        return {"status": "ok"}
+        return {"status": "ok", "version": _core_version}
     except Exception:
         return Response(status_code=500, content="db unavailable")
 
