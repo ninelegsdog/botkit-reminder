@@ -1,31 +1,23 @@
+"""Integration tests with testcontainers (PostgreSQL, Redis)."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 
 from src.core.database import Base
-from src.core.uow import UnitOfWork
-from src.reminder.models import Reminder, ReminderStatus, ReminderType, Subscriber
-from src.reminder.repositories import ReminderRepository, SubscriberRepository
-
-
-def get_postgres_url() -> str | None:
-    import os
-    url = os.getenv("DATABASE_URL", "")
-    if "postgresql" in url:
-        return url
-    return None
+from src.reminder.models import Subscriber, Reminder
 
 
 @pytest.fixture
-async def postgres_session_factory() -> Any:
-    url = get_postgres_url()
-    if not url:
-        pytest.skip("PostgreSQL not available")
-    engine = create_async_engine(url)
+async def postgres_session_factory(postgres_url: str) -> Any:
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from src.core.database import Base
+
+    engine = create_async_engine(postgres_url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -35,12 +27,21 @@ async def postgres_session_factory() -> Any:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
+    from datetime import datetime, timedelta
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from src.core.database import Base
+    from src.core.uow import UnitOfWork
+    from src.reminder.models import Reminder, ReminderStatus, ReminderType, Subscriber
+    from src.reminder.repositories import ReminderRepository, SubscriberRepository
+
     async with postgres_session_factory() as session:
         uow = UnitOfWork(session)
         reminder_repo = ReminderRepository(uow)
         sub_repo = SubscriberRepository(uow)
 
+        # Create subscriber with explicit naive datetime
         sub = Subscriber(user_id=1, username="test", name="Test User")
+        sub.subscribed_at = datetime.now().replace(tzinfo=None)
         session.add(sub)
         await session.commit()
 
@@ -48,13 +49,17 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
         assert fetched_sub is not None
         assert fetched_sub.username == "test"
 
+        # Use timezone-naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE
+        fire_at = datetime.now().replace(tzinfo=None) + timedelta(hours=1)
+        now_naive = datetime.now().replace(tzinfo=None)
         reminder = Reminder(
             creator_id=1,
             type=ReminderType.once,
             text="Integration test",
-            fire_at=datetime.now() + timedelta(hours=1),  # noqa: DTZ005
+            fire_at=fire_at,
             status=ReminderStatus.active,
             is_active=True,
+            created_at=now_naive,
         )
         session.add(reminder)
         await session.commit()
@@ -71,16 +76,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_redis_connection() -> None:
-    import os
-    redis_url = os.getenv("REDIS_URL", "")
-    if not redis_url:
-        pytest.skip("Redis not available")
-    try:
-        import redis.asyncio as aioredis
-        client = aioredis.from_url(redis_url)
-        pong = await client.ping()
-        assert pong is True
-        await client.aclose()
-    except ImportError:
-        pytest.skip("redis package not installed")
+async def test_redis_connection(redis_client) -> None:
+    """Test Redis connection using testcontainers fixture."""
+    pong = await redis_client.ping()
+    assert pong is True
