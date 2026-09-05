@@ -1,21 +1,18 @@
 """Integration tests with testcontainers (PostgreSQL, Redis)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import event
-from sqlalchemy.orm import Session
 
 from src.core.database import Base
-from src.reminder.models import Subscriber, Reminder
+from src.reminder.models import Reminder, Subscriber
 
 
 @pytest.fixture
 async def postgres_session_factory(postgres_url: str) -> Any:
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-    from src.core.database import Base
 
     engine = create_async_engine(postgres_url)
     async with engine.begin() as conn:
@@ -27,11 +24,8 @@ async def postgres_session_factory(postgres_url: str) -> Any:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
-    from datetime import datetime, timedelta
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-    from src.core.database import Base
     from src.core.uow import UnitOfWork
-    from src.reminder.models import Reminder, ReminderStatus, ReminderType, Subscriber
+    from src.reminder.models import ReminderStatus, ReminderType
     from src.reminder.repositories import ReminderRepository, SubscriberRepository
 
     async with postgres_session_factory() as session:
@@ -41,7 +35,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
 
         # Create subscriber with explicit naive datetime
         sub = Subscriber(user_id=1, username="test", name="Test User")
-        sub.subscribed_at = datetime.now().replace(tzinfo=None)
+        sub.subscribed_at = datetime.now(UTC).replace(tzinfo=None)
         session.add(sub)
         await session.commit()
 
@@ -50,8 +44,8 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
         assert fetched_sub.username == "test"
 
         # Use timezone-naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE
-        fire_at = datetime.now().replace(tzinfo=None) + timedelta(hours=1)
-        now_naive = datetime.now().replace(tzinfo=None)
+        fire_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=1)
+        now_naive = datetime.now(UTC).replace(tzinfo=None)
         reminder = Reminder(
             creator_id=1,
             type=ReminderType.once,

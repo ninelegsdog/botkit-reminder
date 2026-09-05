@@ -32,7 +32,6 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest.fixture(scope="session")
 def postgres_container() -> Any:
     """PostgreSQL 16 container for integration tests."""
-    from testcontainers.community.postgres import PostgresContainer
     container = PostgresContainer("postgres:16-alpine")
     container.start()
     yield container
@@ -42,7 +41,6 @@ def postgres_container() -> Any:
 @pytest.fixture(scope="session")
 def redis_container() -> Any:
     """Redis 7 container for integration tests."""
-    from testcontainers.community.redis import RedisContainer
     container = RedisContainer("redis:7-alpine")
     container.start()
     yield container
