@@ -7,7 +7,7 @@ from contextlib import suppress
 from typing import Any
 
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
-from aiogram.types import TelegramObject
+from aiogram.types import ErrorEvent, TelegramObject
 
 from src.core.metrics import ERROR_HANDLER_ERRORS
 
@@ -39,8 +39,8 @@ async def default_error_handler(event: TelegramObject, exc: Exception) -> None:
 
 def register_error_handler(dp: Any) -> None:
     @dp.error()  # type: ignore[untyped-decorator]
-    async def error_handler(event: TelegramObject, exception: Exception) -> None:
-        await default_error_handler(event, exception)
+    async def error_handler(event: ErrorEvent) -> None:
+        await default_error_handler(event, event.exception)
 
 
 class RetryMiddleware:
