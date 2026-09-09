@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 from pathlib import Path
 
@@ -52,7 +53,7 @@ async def _run_webhook(shutdown_event: asyncio.Event) -> None:
     app.router.add_get("/metrics", metrics)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", settings.metrics_port)
+    site = web.TCPSite(runner, os.getenv("BIND_HOST", "0.0.0.0"), settings.metrics_port)
     await site.start()
     logging.info("Webhook HTTP server listening on :%s", settings.metrics_port)
 
