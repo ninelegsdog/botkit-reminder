@@ -41,3 +41,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic handlers for reminders and subscriptions
 - Admin panel with stats
 - Tests with pytest
+
+## 2026-09-14 — CI re-trigger (0-jobs run cleanup)
