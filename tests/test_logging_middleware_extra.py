@@ -18,7 +18,7 @@ async def test_logging_middleware_chat() -> None:
     event.from_user = None
     event.message = None
 
-    async def handler(event, data):
+    async def handler(event: MagicMock, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = await mw(handler, event, {})
@@ -36,7 +36,7 @@ async def test_logging_middleware_from_user() -> None:
     event.from_user = user
     event.message = None
 
-    async def handler(event, data):
+    async def handler(event: MagicMock, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = await mw(handler, event, {})
@@ -56,7 +56,7 @@ async def test_logging_middleware_message_chat() -> None:
     event.from_user = None
     event.message = msg
 
-    async def handler(event, data):
+    async def handler(event: MagicMock, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = await mw(handler, event, {})
@@ -72,7 +72,7 @@ async def test_logging_middleware_no_ids() -> None:
     event.from_user = None
     event.message = None
 
-    async def handler(event, data):
+    async def handler(event: MagicMock, data: dict[str, object]) -> str:
         return get_conversation_id()
 
     result = await mw(handler, event, {})

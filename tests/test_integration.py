@@ -70,7 +70,7 @@ async def test_postgres_repository_crud(postgres_session_factory: Any) -> None:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_redis_connection(redis_client) -> None:
+async def test_redis_connection(redis_client: Any) -> None:
     """Test Redis connection using testcontainers fixture."""
     pong = await redis_client.ping()
     assert pong is True

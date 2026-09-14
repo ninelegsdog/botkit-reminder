@@ -48,19 +48,19 @@ def redis_container() -> Any:
 
 
 @pytest.fixture
-def postgres_url(postgres_container) -> str:
+def postgres_url(postgres_container: Any) -> str:
     """Get PostgreSQL connection URL."""
     return postgres_container.get_connection_url().replace("postgresql+psycopg2", "postgresql+asyncpg")
 
 
 @pytest.fixture
-def redis_url(redis_container) -> str:
+def redis_url(redis_container: Any) -> str:
     """Get Redis connection URL."""
     return f"redis://{redis_container.get_container_host_ip()}:{redis_container.get_exposed_port(6379)}"
 
 
 @pytest.fixture
-async def db_engine(postgres_url: str):
+async def db_engine(postgres_url: str) -> Any:
     """Create async SQLAlchemy engine."""
     from sqlalchemy.ext.asyncio import create_async_engine
     engine = create_async_engine(postgres_url, echo=False)
@@ -69,7 +69,7 @@ async def db_engine(postgres_url: str):
 
 
 @pytest.fixture
-async def db_session(db_engine):
+async def db_session(db_engine: Any) -> Any:
     """Create database session for tests."""
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
     async_session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
@@ -78,7 +78,7 @@ async def db_session(db_engine):
 
 
 @pytest.fixture
-async def redis_client(redis_url: str):
+async def redis_client(redis_url: str) -> Any:
     """Create Redis client for tests."""
     import redis.asyncio as redis
     client = redis.from_url(redis_url, decode_responses=True)
@@ -133,7 +133,7 @@ def pytest_collection_modifyitems(config: Any, items: Any) -> None:
             item.add_marker(pytest.mark.no_req)
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--run-integration",
         action="store_true",

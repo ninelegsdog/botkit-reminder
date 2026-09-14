@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCAN = [ROOT / "src", ROOT / "bot.py"]
 
 
-def _collect():
+def _collect() -> tuple[dict[str, str], list[tuple[str, str]]]:
     emits: dict[str, str] = {}
     handles: list[tuple[str, str]] = []
     for f in ROOT.rglob("*.py"):
@@ -25,7 +25,7 @@ def _collect():
     return emits, handles
 
 
-def test_callback_buttons_have_handlers():
+def test_callback_buttons_have_handlers() -> None:
     emits, handles = _collect()
     eq = {p for k, p in handles if k == "=="}
     pr = {p for k, p in handles if k == "pre"}
@@ -39,7 +39,7 @@ def test_callback_buttons_have_handlers():
     assert not missing, f"callback_data без хэндлера: {missing}"
 
 
-def test_every_emit_is_a_value():
+def test_every_emit_is_a_value() -> None:
     """Прод-код: убрать хэндлер -> тест падает, убрать кнопку -> тест падает."""
     emits, _ = _collect()
     assert emits, "нет эмитед callback_data — проверь обход сканера"
