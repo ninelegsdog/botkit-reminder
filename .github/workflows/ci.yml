@@ -120,7 +120,7 @@ jobs:
 
   load-test:
     runs-on: ubuntu-latest
-    needs: check
+    
     if: false  # Manual only for now, k6 sanity 100 RPS
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.0.0
