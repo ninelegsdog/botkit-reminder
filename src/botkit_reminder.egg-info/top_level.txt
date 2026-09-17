@@ -1,5 +1,0 @@
-__init__
-admin
-core
-reminder
-scheduler

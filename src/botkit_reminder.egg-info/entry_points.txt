@@ -1,2 +1,0 @@
-[console_scripts]
-bot = botkit_reminder.bot:main
