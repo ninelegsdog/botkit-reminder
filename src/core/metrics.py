@@ -14,6 +14,8 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 logger = logging.getLogger(__name__)
 
+_BUILD_SHA = os.getenv("BUILD_SHA", "unknown")
+
 UPDATES_TOTAL = BOTKIT_UPDATES_TOTAL
 
 SCHEDULER_TICKS = Counter(
@@ -87,8 +89,21 @@ class Metrics:
         return time.time() - self._start
 
 
+try:
+    from botkit_core import __version__ as _core_version
+except ImportError:
+    _core_version = "0.0.0"
+
+
 async def health(request: web.Request) -> web.Response:
+    accept = request.headers.get("Accept", "")
+    if "application/json" in accept:
+        return web.json_response({"status": "ok", "version": _core_version, "commit": _BUILD_SHA})
     return web.Response(text="ok")
+
+
+async def version(request: web.Request) -> web.Response:
+    return web.json_response({"version": _core_version, "service": "botkit-reminder", "commit": _BUILD_SHA})
 
 
 async def metrics(request: web.Request) -> web.Response:
@@ -98,6 +113,7 @@ async def metrics(request: web.Request) -> web.Response:
 def create_metrics_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/health", health)
+    app.router.add_get("/version", version)
     app.router.add_get("/metrics", metrics)
     return app
 
