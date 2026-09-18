@@ -24,4 +24,6 @@ RUN mkdir -p /app/data /app/backups && chown -R appuser:appgroup /app
 USER appuser
 EXPOSE 8080
 ARG PORT
+ARG BUILD_SHA
+ENV BUILD_SHA=$BUILD_SHA
 CMD ["python", "bot.py"]

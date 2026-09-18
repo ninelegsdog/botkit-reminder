@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import os
 from typing import Any
 
 from aiogram.types import Update
@@ -16,6 +17,7 @@ try:
     from botkit_core import __version__ as _core_version
 except ImportError:
     _core_version = "0.0.0"
+_BUILD_SHA = os.getenv("BUILD_SHA", "unknown")
 
 app = FastAPI(
     title="BotKit Reminder API",
@@ -60,7 +62,7 @@ app.openapi = custom_openapi  # type: ignore[method-assign]
 
 @app.get("/version")
 async def version() -> dict[str, str]:
-    return {"version": _core_version, "service": "botkit-reminder"}
+    return {"version": _core_version, "service": "botkit-reminder", "commit": _BUILD_SHA}
 
 
 @app.get("/health", response_model=None)
@@ -70,7 +72,7 @@ async def health() -> dict[str, str] | Response:
 
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
-        return {"status": "ok", "version": _core_version}
+        return {"status": "ok", "version": _core_version, "commit": _BUILD_SHA}
     except Exception:
         return Response(status_code=500, content="db unavailable")
 
