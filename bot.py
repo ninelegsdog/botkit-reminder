@@ -15,7 +15,7 @@ from src.core.commands import set_commands
 from src.core.config import settings
 from src.core.errors import register_error_handler
 from src.core.logging import LoggingMiddleware, setup_logging
-from src.core.metrics import health, metrics, start_metrics_server
+from src.core.metrics import health, metrics, start_metrics_server, version
 from src.core.sentry import init_sentry
 from src.core.tgwebhook import build_webhook_app
 from src.core.throttling import ThrottlingMiddleware
@@ -50,6 +50,7 @@ async def _run_webhook(shutdown_event: asyncio.Event) -> None:
     app = build_webhook_app(state.dp, state.bot, settings.telegram_webhook_secret)
     app["state"] = state
     app.router.add_get("/health", health)
+    app.router.add_get("/version", version)
     app.router.add_get("/metrics", metrics)
     runner = web.AppRunner(app)
     await runner.setup()
