@@ -33,3 +33,5 @@ logs/
 *~
 .DS_Store
 Thumbs.db
+# C1: prod deployment runtime (never commit)
+deploy/.env
