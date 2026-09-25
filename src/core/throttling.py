@@ -24,7 +24,7 @@ class ThrottlingMiddleware(BaseMiddleware):
         if not user:
             return await handler(event, **data)
 
-        key = f"throttle:{handler.__name__}:{user.id}"
+        key = f"throttle:reminder:{handler.__name__}:{user.id}"
         now = time.time()
         try:
             last = await self._redis.get(key)
