@@ -4,9 +4,7 @@ import asyncio
 import logging
 import os
 import signal
-from pathlib import Path
 
-from aiogram.types import BufferedInputFile
 from aiohttp import web
 
 from src.core.bot_factory import state
@@ -22,13 +20,6 @@ from src.core.throttling import ThrottlingMiddleware
 from src.core.tracing import TracingMiddleware, setup_tracing
 from src.reminder import register_routers
 from src.reminder.scheduler import Scheduler
-
-
-def _load_cert(path: str) -> BufferedInputFile | None:
-    cert_path = Path(path)
-    if not cert_path.is_file():
-        return None
-    return BufferedInputFile(cert_path.read_bytes(), filename="webhook_public.pem")
 
 
 def _setup_dp() -> None:
@@ -59,15 +50,17 @@ async def _run_webhook(shutdown_event: asyncio.Event) -> None:
     logging.info("Webhook HTTP server listening on :%s", settings.metrics_port)
 
     await state.bot.delete_webhook(drop_pending_updates=True)
-    cert = await asyncio.to_thread(_load_cert, settings.webhook_cert_path)
-    if cert is None:
-        logging.warning("WEBHOOK_CERT_PATH not found: %s", settings.webhook_cert_path)
-    else:
-        logging.info("Using webhook certificate")
+    # No certificate here on purpose. Telegram's setWebhook pins the bot to the CA of
+    # whatever certificate is passed, so a renewal leaves the bot delivering to an
+    # endpoint it can no longer verify: updates stop while setWebhook still reports
+    # success. That is exactly the 26.09 incident - four of nine bots stopped
+    # receiving updates after certbot rotated the certificate, and only the bots that
+    # had been restarted re-registered, so the rest stayed healthy and hid the cause.
+    # TLS terminates at nginx with a publicly trusted certificate, so Telegram
+    # verifies the endpoint through the normal CA bundle and needs no pin.
     await state.bot.set_webhook(
         url=settings.webhook_url,
         secret_token=settings.telegram_webhook_secret or None,
-        certificate=cert,
     )
     logging.info("Telegram webhook registered: %s", settings.webhook_url)
     try:
