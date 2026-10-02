@@ -44,6 +44,11 @@ pytest
 docker compose up -d
 ```
 
+## Документация
+
+Процесс разработки целиком описан в
+[agentic-development-playbook](https://github.com/ninelegsdog/agentic-development-playbook).
+
 ## Лицензия
 
 MIT
