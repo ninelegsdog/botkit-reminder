@@ -22,7 +22,7 @@ class ThrottlingMiddleware(BaseMiddleware):
     ) -> Any:
         user = getattr(event, "from_user", None)
         if not user:
-            return await handler(event, **data)
+            return await handler(event, data)
 
         key = f"throttle:reminder:{handler.__name__}:{user.id}"
         now = time.time()
@@ -33,4 +33,4 @@ class ThrottlingMiddleware(BaseMiddleware):
             await self._redis.set(key, str(now), ex=int(self._rate_limit * 2))
         except Exception:
             pass  # Don't fail on Redis errors
-        return await handler(event, **data)
+        return await handler(event, data)

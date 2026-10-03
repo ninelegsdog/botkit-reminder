@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `ThrottlingMiddleware` passed context to the next handler as `handler(event, **data)`
+  (aiogram 2 convention) while running on aiogram 3, where the wrapped handler is
+  `handler(event, data)`. Every text update raised
+  `TypeError: ... got an unexpected keyword argument 'dispatcher'` and the user never got
+  a reply. Now `handler(event, data)`; regression covered by
+  `tests/test_throttling_contract.py`.
+
 ## [0.2.0] - 2026-08-21
 
 ### Added
