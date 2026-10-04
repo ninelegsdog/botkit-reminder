@@ -92,10 +92,10 @@ def patched_uow(fake_uow: Any) -> Any:
 
 class TestPublicHandlers:
 
-    async def test_cmd_start(self, router):
+    async def test_cmd_start(self, router, fsm):
         handler = _find(router, "message", "cmd_start")
         msg = _make_message(text="/start")
-        await handler(msg)
+        await handler(msg, fsm)
         msg.answer.assert_awaited_once()
         assert "Подпишитесь на напоминания" in msg.answer.await_args[0][0]
 

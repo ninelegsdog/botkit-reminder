@@ -31,7 +31,8 @@ def create_router() -> Router:
     router = Router()
 
     @router.message(CommandStart())
-    async def cmd_start(message: Message) -> None:
+    async def cmd_start(message: Message, state: FSMContext) -> None:
+        await state.clear()
         text = compose_message(
             nav_header("ReminderBot"),
             "Подпишитесь на напоминания и рассылки. Или начните с кнопки ниже.",
