@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Chat, User
@@ -15,6 +16,10 @@ from aiogram.types import Chat, User
 from src.core.auth import admin_gate
 from src.reminder.handlers import create_router
 from src.reminder.models import ReminderType
+
+
+class _TestStates(StatesGroup):
+    in_progress = State()
 
 
 def _user(uid: int = 456) -> User:
@@ -98,6 +103,14 @@ class TestPublicHandlers:
         await handler(msg, fsm)
         msg.answer.assert_awaited_once()
         assert "Подпишитесь на напоминания" in msg.answer.await_args[0][0]
+
+    async def test_cmd_start_clears_fsm_state(self, router, fsm):
+        """/start посреди сценария обязан сбросить состояние."""
+        await fsm.set_state(_TestStates.in_progress)
+        assert await fsm.get_state() is not None
+        handler = _find(router, "message", "cmd_start")
+        await handler(_make_message(text="/start"), fsm)
+        assert await fsm.get_state() is None
 
     async def test_subscribe(self, router, patched_uow):
         handler = _find(router, "message", "subscribe")
