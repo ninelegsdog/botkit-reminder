@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hmac
 import os
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _distribution_version
 from typing import Any
 
 from aiogram.types import Update
@@ -17,12 +19,18 @@ try:
     from botkit_core import __version__ as _core_version
 except ImportError:
     _core_version = "0.0.0"
+
+try:
+    # Single source of truth for the service version is pyproject.toml.
+    _service_version = _distribution_version("botkit-reminder")
+except PackageNotFoundError:  # pragma: no cover - source checkout without install
+    _service_version = "0.0.0"
 _BUILD_SHA = os.getenv("BUILD_SHA", "unknown")
 
 app = FastAPI(
     title="BotKit Reminder API",
     description="Telegram bot webhook API for reminders and newsletters",
-    version="0.2.0",
+    version=_service_version,
     docs_url="/docs",
     redoc_url="/redoc",
 )
