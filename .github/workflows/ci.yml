@@ -81,21 +81,21 @@ jobs:
             echo "Version not found in pyproject.toml"
             exit 1
           fi
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          TAG=$(git tag --list 'v*' --sort=-v:refname | head -n1)
           TAG_VERSION=${TAG#v}
           echo "pyproject version: $VERSION"
-          echo "latest git tag:    ${TAG:-<none>}"
+          echo "highest git tag:   ${TAG:-<none>}"
           if [ -n "$TAG_VERSION" ]; then
             LOWEST=$(printf '%s\n%s\n' "$VERSION" "$TAG_VERSION" | sort -V | head -n1)
-            if [ "$LOWEST" != "$VERSION" ]; then
-              echo "Version drift: pyproject $VERSION is behind the latest tag $TAG_VERSION"
+            if [ "$LOWEST" = "$VERSION" ] && [ "$VERSION" != "$TAG_VERSION" ]; then
+              echo "Version drift: pyproject $VERSION is behind the highest tag $TAG_VERSION"
               exit 1
             fi
             if [ "$VERSION" != "$TAG_VERSION" ]; then
               echo "Note: pyproject $VERSION is ahead of tag $TAG_VERSION (release pending)"
             fi
           else
-            echo "No git tag found; skipping tag comparison"
+            echo "No version tag found; skipping tag comparison"
           fi
           echo "Version drift check passed for $VERSION"
 
