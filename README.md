@@ -15,7 +15,7 @@ Telegram-бот напоминаний и рассылок. Часть порт�
 
 ## Стек
 
-- Python 3.13
+- Python 3.12+
 - aiogram 3.30+
 - SQLAlchemy + aiosqlite (WAL)
 - Redis-FSM
@@ -29,7 +29,7 @@ cp .env.example .env
 uv venv && source .venv/bin/activate
 uv pip install -e ".[dev]"
 alembic upgrade head
-python -m botkit_reminder.bot
+python -m bot
 ```
 
 ## Тесты
@@ -42,6 +42,18 @@ pytest
 
 ```bash
 docker compose up -d
+```
+
+## Бэкапы
+
+Бэкапы и восстановление — общий контур на проде (systemd-таймеры, offsite restic,
+один общий Redis на все боты), а не отдельный скрипт внутри репозитория.
+Актуальная процедура и оговорки — в
+[`botkit-monitoring/ops/backup/RESTORE.md`](https://github.com/ninelegsdog/botkit-monitoring/blob/main/ops/backup/RESTORE.md).
+
+```bash
+# проверка бэкапа этого бота (ничего не меняет)
+/root/restore_test.sh botkit-reminder
 ```
 
 ## Документация
@@ -72,4 +84,4 @@ MIT
 Implementation code was generated with AI coding agents under human-led engineering control.
 
 Полное описание процесса, шаблон `AGENTS.md` и чек-листы ревью AI-кода и секретов —
-в репозитории [agentic-development-playbook](https://github.com/ninelegsdog).
+в репозитории [agentic-development-playbook](https://github.com/ninelegsdog/agentic-development-playbook).
