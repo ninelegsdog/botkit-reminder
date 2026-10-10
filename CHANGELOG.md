@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a reply. Now `handler(event, data)`; regression covered by
   `tests/test_throttling_contract.py`.
 
+### CI
+- 2026-09-14 — повторный запуск CI и очистка прогонов с 0 jobs.
+
+## [1.0.0] - 2026-08-28
+
+### Added
+- Продакшен-релиз 1.0.0: напоминания и рассылки, админка в чате, поддержка 152-ФЗ.
+  Теги `v1.0.1`–`v1.0.6` — итерации релизной линии 1.0.x (детали в истории коммитов).
+
 ## [0.2.0] - 2026-08-21
 
 ### Added
@@ -51,5 +60,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic handlers for reminders and subscriptions
 - Admin panel with stats
 - Tests with pytest
-
-## 2026-09-14 — CI re-trigger (0-jobs run cleanup)
