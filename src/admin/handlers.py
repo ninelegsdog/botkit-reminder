@@ -29,8 +29,18 @@ def create_router() -> Router:
         from src.core.auth import admin_gate, verify_password
         if not message.from_user or not message.text:
             return
+        uid = message.from_user.id
+        # The gate kept no record of failures, so the admin surface accepted unlimited
+        # guesses. Checked BEFORE the comparison, so the limit actually refuses.
+        if admin_gate.is_throttled(uid):
+            await state.clear()
+            await message.answer(
+                "⏳ Слишко много попыток. "
+                "Попробуйте через 5 минут."
+            )
+            return
         if verify_password(message.text):
-            admin_gate.login(message.from_user.id)
+            admin_gate.login(uid)
             await state.clear()
             await message.answer(
                 "✅ Админ-доступ открыт",
@@ -41,6 +51,7 @@ def create_router() -> Router:
                 ),
             )
         else:
+            admin_gate.record_failure(uid)
             await message.answer("❌ Неверный пароль")
 
     @router.message(F.text == "📊 Статистика")
