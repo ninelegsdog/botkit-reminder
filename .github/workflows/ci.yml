@@ -58,7 +58,7 @@ jobs:
       - name: Type check
         run: uv run --frozen mypy src/ tests/ --ignore-missing-imports
       - name: Test
-        run: uv run --frozen pytest
+        run: uv run --frozen pytest --run-integration
         env:
           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
           REDIS_URL: redis://localhost:6379/0
