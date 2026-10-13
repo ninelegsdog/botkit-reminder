@@ -400,7 +400,7 @@ wheels = [
 [[package]]
 name = "botkit-core"
 version = "0.8.2"
-source = { git = "https://github.com/ninelegsdog/botkit-core?rev=v0.8.3#d3e877f9b41d0ea294b3ce5b75f9aac43125f733" }
+source = { git = "https://github.com/ninelegsdog/botkit-core?rev=v0.8.4#99cb19da8169497ed2ac1fc90700af6f0f6e0525" }
 dependencies = [
     { name = "aiogram" },
     { name = "aiohttp" },
@@ -466,7 +466,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "apscheduler", specifier = ">=3.10" },
     { name = "asyncpg", specifier = ">=0.29" },
-    { name = "botkit-core", git = "https://github.com/ninelegsdog/botkit-core?rev=v0.8.3" },
+    { name = "botkit-core", git = "https://github.com/ninelegsdog/botkit-core?rev=v0.8.4" },
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.100" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0" },
