@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.core.auth import admin_only
+from src.core.callbacks import parse_callback_int
 from src.core.navigation import compose_message, nav_header, reply_menu
 from src.core.ui import escape
 from src.core.uow import UnitOfWork
@@ -218,7 +219,10 @@ def create_router() -> Router:
     async def delete_reminder_prompt(callback: CallbackQuery) -> None:
         if not callback.data:
             return
-        reminder_id = int(callback.data.split(":")[-1])
+        reminder_id = parse_callback_int(callback.data, "rem:delete:")
+        if reminder_id is None:
+            await callback.answer("Некорректный запрос.", show_alert=True)
+            return
         if callback.message:
             await callback.message.edit_text("❓ Удалить это напоминание?", reply_markup=_delete_button(reminder_id))  # type: ignore[union-attr]
 
@@ -226,7 +230,10 @@ def create_router() -> Router:
     async def delete_reminder_confirm(callback: CallbackQuery) -> None:
         if not callback.data:
             return
-        reminder_id = int(callback.data.split(":")[-1])
+        reminder_id = parse_callback_int(callback.data, "rem:confirm:delete:")
+        if reminder_id is None:
+            await callback.answer("Некорректный запрос.", show_alert=True)
+            return
         async with UnitOfWork() as uow:
             service = ReminderService(uow)
             await service.cancel_reminder(reminder_id)
