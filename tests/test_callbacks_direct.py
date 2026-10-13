@@ -13,19 +13,19 @@ from src.core.callbacks import (
 )
 
 
-def test_accepts_a_bare_positive_integer():
+def test_accepts_a_bare_positive_integer() -> None:
     assert parse_callback_int("p:1", "p:") == 1
     assert parse_callback_int("p:4242", "p:") == 4242
 
 
-def test_rejects_wrong_prefix_and_missing_data():
+def test_rejects_wrong_prefix_and_missing_data() -> None:
     assert parse_callback_int(None, "p:") is None
     assert parse_callback_int("", "p:") is None
     assert parse_callback_int("q:1", "p:") is None
     assert parse_callback_int("p:", "p:") is None
 
 
-def test_rejects_digits_int_would_have_accepted():
+def test_rejects_digits_int_would_have_accepted() -> None:
     # int() is happy with a sign, underscores, surrounding spaces and non-ASCII digits;
     # split(":")[1] silently took the first segment of "5:9".
     assert parse_callback_int("p:-1", "p:") is None
@@ -38,11 +38,11 @@ def test_rejects_digits_int_would_have_accepted():
     assert parse_callback_int("p:5:9", "p:") is None  # extra segment
 
 
-def test_rejects_an_overlong_digit_run():
+def test_rejects_an_overlong_digit_run() -> None:
     assert parse_callback_int("p:" + "9" * 19, "p:") is None
 
 
-def test_wellformed_respects_the_64_byte_cap():
+def test_wellformed_respects_the_64_byte_cap() -> None:
     assert MAX_CALLBACK_BYTES == 64
     assert callback_is_wellformed("p:1", "p:") is True
     over = "p:" + "1" * (MAX_CALLBACK_BYTES - 1)
