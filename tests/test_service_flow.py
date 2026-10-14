@@ -21,7 +21,9 @@ async def test_start_command() -> None:
     mock_response.__aenter__ = AsyncMock(return_value=mock_response)
     mock_response.__aexit__ = AsyncMock(return_value=False)
 
-    with patch.object(bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response):
+    with patch.object(
+        bot.session, "make_request", new_callable=AsyncMock, return_value=mock_response
+    ) as mock_request:
         dp = Dispatcher(storage=MemoryStorage())
         app_state = create_bot()
         app_state.dp = dp
@@ -36,4 +38,9 @@ async def test_start_command() -> None:
         )
         update = Update(update_id=1, message=message)
         await dp.feed_update(bot, update)
-        assert True
+
+    # /start must dispatch a real outbound API call carrying the greeting.
+    # (was `assert True`, which passed even if the handler never replied)
+    assert mock_request.await_count >= 1
+    sent = " ".join(str(call) for call in mock_request.await_args_list)
+    assert "Подпишитесь на напоминания и рассылки" in sent
