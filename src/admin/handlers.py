@@ -35,7 +35,7 @@ def create_router() -> Router:
         if admin_gate.is_throttled(uid):
             await state.clear()
             await message.answer(
-                "⏳ Слишко много попыток. "
+                "⏳ Слишком много попыток. "
                 "Попробуйте через 5 минут."
             )
             return
