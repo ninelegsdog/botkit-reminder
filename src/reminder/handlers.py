@@ -296,8 +296,8 @@ def create_router() -> Router:
         else:
             await message.answer("❌ Неверный пароль")
 
-    @admin_only
     @router.message(F.text == "📊 Статистика")
+    @admin_only
     async def admin_stats(message: Message) -> None:
         from src.admin.service import AdminService
         async with UnitOfWork() as uow:
@@ -305,8 +305,8 @@ def create_router() -> Router:
             stats = await service.stats()
         await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
 
-    @admin_only
     @router.message(F.text == "👥 Подписчики")
+    @admin_only
     async def admin_subscribers(message: Message) -> None:
         from src.admin.service import AdminService
         async with UnitOfWork() as uow:

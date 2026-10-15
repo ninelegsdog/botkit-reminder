@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Админ-гард на «📊 Статистика» и «👥 Подписчики» не срабатывал: декоратор
+  `@admin_only` стоял ВЫШЕ `@router.message(...)`, поэтому роутер регистрировал
+  незащищённый обработчик, и не-админ читал статистику и список подписчиков
+  (user_id, username, имя). Порядок декораторов исправлен (роутер сверху, гард
+  снизу — как у соседних обработчиков); регресс — `tests/test_admin_guard_order.py`,
+  строчная проверка, что гард идёт последним декоратором у каждого обработчика.
+
 - `ThrottlingMiddleware` passed context to the next handler as `handler(event, **data)`
   (aiogram 2 convention) while running on aiogram 3, where the wrapped handler is
   `handler(event, data)`. Every text update raised
