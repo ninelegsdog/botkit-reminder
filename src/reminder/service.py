@@ -146,8 +146,11 @@ class BroadcastService:
                 unsubscribed += 1
                 continue
             try:
-                if self.bot:
-                    await self._send_with_retry(self.bot, sub.user_id, broadcast.text)
+                if not self.bot:
+                    # Собранный без бота сервис не шлёт ничего — раньше это
+                    # молча помечалось delivered, и админ видел ложный успех.
+                    raise RuntimeError("BroadcastService не подключён к боту")
+                await self._send_with_retry(self.bot, sub.user_id, broadcast.text)
                 recipient.status = BroadcastStatus.delivered
                 recipient.delivered_at = datetime.now(UTC)
                 delivered += 1
@@ -208,7 +211,11 @@ class SubscriptionService:
         result = await self.session.execute(stmt)
         sub = result.scalar_one_or_none()
         if sub:
-            sub.is_active = False
+            # 152-ФЗ: обещание каталога «данные подписчика удаляются» —
+            # удаляем строку, а не гасим флаг. broadcast_recipients и
+            # reminder_recipients хранят user_id без FK на подписчика,
+            # поэтому история рассылок при удалении сохраняется.
+            await self.session.delete(sub)
 
     async def get_subscriber(self, user_id: int) -> Subscriber | None:
         stmt = select(Subscriber).where(Subscriber.user_id == user_id)
