@@ -28,6 +28,7 @@ def _fake_uow() -> Any:
     session = MagicMock()
     session.add = MagicMock()
     session.flush = AsyncMock()
+    session.delete = AsyncMock()
     session.commit = AsyncMock()
     result = MagicMock()
     result.scalar_one = MagicMock(return_value=5)
@@ -144,8 +145,10 @@ class TestBroadcastService:
         service = BroadcastService(uow)
         await service.send_broadcast(1)
         assert broadcast.total == 2
-        assert broadcast.delivered == 1
-        assert broadcast.failed == 0
+        # Сервис без бота ничего не шлёт: доставленного не может быть,
+        # получатель помечается failed (раньше здесь стоял ложный delivered).
+        assert broadcast.delivered == 0
+        assert broadcast.failed == 1
         assert broadcast.unsubscribed == 1
         assert broadcast.sent_at is not None
 
@@ -256,7 +259,8 @@ class TestSubscriptionService:
         uow.session.execute.return_value.scalar_one_or_none.return_value = existing
         service = SubscriptionService(uow)
         await service.unsubscribe(100)
-        assert existing.is_active is False
+        # 152-ФЗ: отписка удаляет строку подписчика, а не гасит is_active.
+        uow.session.delete.assert_awaited_once_with(existing)
 
     async def test_unsubscribe_missing(self):
         uow = _fake_uow()

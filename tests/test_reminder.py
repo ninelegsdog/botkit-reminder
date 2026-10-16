@@ -41,4 +41,5 @@ async def test_subscribe(session_factory: Any) -> None:
         sub = await service.subscribe(1, "user", "Name")
         assert sub.is_active is True
         await service.unsubscribe(1)
-        assert sub.is_active is False
+        # 152-ФЗ: отписка удаляет данные подписчика, а не гасит флаг.
+        assert await service.get_subscriber(1) is None

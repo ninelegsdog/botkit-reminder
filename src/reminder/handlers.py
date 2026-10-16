@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -28,7 +28,7 @@ def _delete_button(reminder_id: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def create_router() -> Router:
+def create_router(bot: Bot | None = None) -> Router:
     router = Router()
 
     @router.message(CommandStart())
@@ -203,17 +203,15 @@ def create_router() -> Router:
             )
             return
         lines = []
+        kb = InlineKeyboardBuilder()
         for r in reminders:
             when = r.fire_at.strftime("%d.%m.%Y %H:%M") if r.fire_at else r.cron_day or "?"
             lines.append(f"#{r.id} {r.type.value} {when} — {escape(r.text)}")
-        await message.answer(
-            "\n".join(lines),
-            reply_markup=reply_menu(
-                "⏰ Мои напоминания",
-                "📣 Рассылки",
-                "➕ Добавить",
-            ),
-        )
+            kb.add(
+                InlineKeyboardButton(text=f"🗑 Удалить #{r.id}", callback_data=f"rem:delete:{r.id}")
+            )
+        kb.adjust(1)
+        await message.answer("\n".join(lines), reply_markup=kb.as_markup())
 
     @router.callback_query(F.data.startswith("rem:delete:"))
     async def delete_reminder_prompt(callback: CallbackQuery) -> None:
@@ -259,7 +257,7 @@ def create_router() -> Router:
         if not message.text:
             return
         async with UnitOfWork() as uow:
-            service = BroadcastService(uow)
+            service = BroadcastService(uow, bot=bot)
             broadcast = await service.create_broadcast(message.text, segment="active")
             await service.send_broadcast(broadcast.id)
         await state.clear()
