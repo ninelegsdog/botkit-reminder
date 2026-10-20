@@ -35,3 +35,6 @@ logs/
 Thumbs.db
 # C1: prod deployment runtime (never commit)
 deploy/.env
+
+# Coverage JSON report (artifact, not source)
+coverage.json

@@ -60,10 +60,16 @@ jobs:
       - name: Type check
         run: uv run --frozen mypy src/ tests/ --ignore-missing-imports
       - name: Test
-        run: uv run --frozen pytest --run-integration
+        run: uv run --frozen pytest --run-integration --cov=src --cov-report=json:coverage.json
         env:
           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
           REDIS_URL: redis://localhost:6379/0
+      - name: Per-module coverage floors
+        # Total coverage is diluted by well-covered infrastructure: a bot can sit
+        # at 70% total while the module that decides what it answers sits far
+        # lower. This gate checks each bot's own modules against
+        # scripts/coverage-floors.json - not a second aggregate.
+        run: python3 scripts/check-coverage.py . scripts/coverage-floors.json coverage.json
       
       # Pre-commit checks
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
