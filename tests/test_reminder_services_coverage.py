@@ -241,7 +241,10 @@ class TestSubscriptionService:
         sub = await service.subscribe(100, "u100", "Name")
         assert sub.user_id == 100
         assert sub.username == "u100"
-        uow.session.add.assert_called_once()
+        # F6: subscribe пишет событие в журнал (аудит 152-ФЗ) — add вызывается
+        # дважды: строка подписчика и событие "subscribed".
+        assert uow.session.add.call_count == 2
+        assert uow.session.add.call_args_list[0].args[0] is sub
 
     async def test_subscribe_existing(self):
         uow = _fake_uow()

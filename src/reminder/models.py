@@ -91,6 +91,25 @@ class Subscriber(Base):
     subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
 
 
+class SubscriptionEvent(Base):
+    """Журнал событий подписки (аудит 152-ФЗ).
+
+    Факт подписки/отписки сохраняется отдельно от строки подписчика: при
+    отписке строка `subscribers` удаляется (обещание каталога «данные
+    подписчика удаляются»), а факт события остаётся здесь. Это и есть «история»
+    из приёмки F6 — без персональных данных (имя/username) подписчика.
+    """
+
+    __tablename__ = "subscription_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    event: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(UTC), nullable=False)
+
+    __table_args__ = (Index("ix_subscription_events_user_id", "user_id"),)
+
+
 class Broadcast(Base):
     __tablename__ = "broadcasts"
 

@@ -22,7 +22,12 @@ from src.reminder.models import (
     ReminderType,
     Subscriber,
 )
-from src.reminder.repositories import BroadcastRecipientRepository, ReminderRepository, SubscriberRepository
+from src.reminder.repositories import (
+    BroadcastRecipientRepository,
+    ReminderRepository,
+    SubscriberRepository,
+    SubscriptionEventRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +192,7 @@ class SubscriptionService:
     def __init__(self, uow: UnitOfWork) -> None:
         self._uow = uow
         self._subscribers = SubscriberRepository(uow)
+        self._events = SubscriptionEventRepository(uow)
 
     @property
     def session(self) -> AsyncSession:
@@ -204,6 +210,9 @@ class SubscriptionService:
             sub = Subscriber(user_id=user_id, username=username, name=name)
             self.session.add(sub)
         await self.session.flush()
+        # F6: факт подписки сохраняется в журнале (аудит 152-ФЗ), даже если
+        # позже строка подписчика будет удалена по отписке — история не теряется.
+        await self._events.record(user_id, "subscribed")
         return sub
 
     async def unsubscribe(self, user_id: int) -> None:
@@ -211,13 +220,28 @@ class SubscriptionService:
         result = await self.session.execute(stmt)
         sub = result.scalar_one_or_none()
         if sub:
-            # 152-ФЗ: обещание каталога «данные подписчика удаляются» —
-            # удаляем строку, а не гасим флаг. broadcast_recipients и
-            # reminder_recipients хранят user_id без FK на подписчика,
-            # поэтому история рассылок при удалении сохраняется.
+            # F6: сначала записываем факт отписки в журнал (аудит 152-ФЗ),
+            # затем удаляем строку подписчика — обещание каталога
+            # «данные подписчика удаляются» сохраняется, а факт «был подписан»
+            # в истории остаётся. broadcast_recipients и reminder_recipients
+            # хранят user_id без FK на подписчика — та же позиция.
+            await self._events.record(user_id, "unsubscribed")
             await self.session.delete(sub)
 
     async def get_subscriber(self, user_id: int) -> Subscriber | None:
         stmt = select(Subscriber).where(Subscriber.user_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def subscription_history(self, user_id: int) -> list:
+        """F6: журнал событий подписки пользователя (аудит 152-ФЗ).
+
+        Возвращает события в хронологическом порядке. Сохраняется после
+        удаления строки подписчика — именно это делает «видна история»
+        возможной при соблюдении обещания каталога «данные подписчика удаляются».
+        """
+        return await self._events.list_for_user(user_id)
+
+    async def total_unsubscribed(self) -> int:
+        """Количество событий отписки (аудит-счётчик для админ-панели)."""
+        return await self._events.count_unsubscribed()

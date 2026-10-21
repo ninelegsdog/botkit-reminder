@@ -35,6 +35,10 @@ async def _run_webhook(shutdown_event: asyncio.Event) -> None:
     await set_commands(state.bot)
     await cache.init()
 
+    from src.core.database import Base, engine
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     scheduler = Scheduler(state.db.async_session, state.bot.send_message)
     scheduler.start()
 
