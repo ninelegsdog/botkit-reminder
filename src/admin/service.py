@@ -24,7 +24,10 @@ class AdminService:
         stmt2 = select(func.count()).select_from(Reminder)
         result2 = await self.session.execute(stmt2)
         reminders = result2.scalar_one()
-        return {"subscribers": subs, "reminders": reminders}
+        from src.core.uow import UnitOfWork
+        from src.reminder.service import SubscriptionService
+        unsubs = await SubscriptionService(UnitOfWork(self.session)).total_unsubscribed()
+        return {"subscribers": subs, "reminders": reminders, "unsubscribed": unsubs}
 
     async def subscribers(self) -> Sequence[Subscriber]:
         stmt = select(Subscriber).where(Subscriber.is_active)

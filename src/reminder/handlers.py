@@ -301,7 +301,7 @@ def create_router(bot: Bot | None = None) -> Router:
         async with UnitOfWork() as uow:
             service = AdminService(uow)
             stats = await service.stats()
-        await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}")
+        await message.answer(f"Подписчиков: {stats['subscribers']}\nНапоминаний: {stats['reminders']}\nОтписок: {stats.get('unsubscribed', 0)}")
 
     @router.message(F.text == "👥 Подписчики")
     @admin_only

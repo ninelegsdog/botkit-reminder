@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.uow import UnitOfWork
@@ -14,6 +14,7 @@ from src.reminder.models import (
     ReminderStatus,
     ReminderType,
     Subscriber,
+    SubscriptionEvent,
 )
 
 
@@ -94,3 +95,30 @@ class SubscriberRepository:
         stmt = select(Subscriber).where(Subscriber.user_id == user_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+class SubscriptionEventRepository:
+    """Аудит-события подписки (F6): история сохраняется без личных данных."""
+
+    def __init__(self, uow: UnitOfWork) -> None:
+        self._uow = uow
+
+    @property
+    def _session(self) -> AsyncSession:
+        return self._uow.session
+
+    async def record(self, user_id: int, event: str) -> None:
+        self._uow.session.add(SubscriptionEvent(user_id=user_id, event=event))
+        await self._uow.session.flush()
+
+    async def list_for_user(self, user_id: int) -> Sequence[SubscriptionEvent]:
+        stmt = select(SubscriptionEvent).where(
+            SubscriptionEvent.user_id == user_id
+        ).order_by(SubscriptionEvent.created_at)
+        result = await self._session.execute(stmt)
+        return result.scalars().all()
+
+    async def count_unsubscribed(self) -> int:
+        stmt = select(func.count()).select_from(SubscriptionEvent).where(
+            SubscriptionEvent.event == "unsubscribed"
+        )
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
