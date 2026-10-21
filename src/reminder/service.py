@@ -21,6 +21,7 @@ from src.reminder.models import (
     ReminderStatus,
     ReminderType,
     Subscriber,
+    SubscriptionEvent,
 )
 from src.reminder.repositories import (
     BroadcastRecipientRepository,
@@ -233,14 +234,14 @@ class SubscriptionService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def subscription_history(self, user_id: int) -> list:
+    async def subscription_history(self, user_id: int) -> list[SubscriptionEvent]:
         """F6: журнал событий подписки пользователя (аудит 152-ФЗ).
 
         Возвращает события в хронологическом порядке. Сохраняется после
         удаления строки подписчика — именно это делает «видна история»
         возможной при соблюдении обещания каталога «данные подписчика удаляются».
         """
-        return await self._events.list_for_user(user_id)
+        return list(await self._events.list_for_user(user_id))
 
     async def total_unsubscribed(self) -> int:
         """Количество событий отписки (аудит-счётчик для админ-панели)."""

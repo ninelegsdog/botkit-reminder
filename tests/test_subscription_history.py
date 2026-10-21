@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -25,7 +27,7 @@ from src.reminder.service import SubscriptionService
 
 
 @pytest.fixture
-async def session_factory(tmp_path):
+async def session_factory(tmp_path: Any) -> Any:
     db = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
     async with engine.begin() as conn:
@@ -34,7 +36,7 @@ async def session_factory(tmp_path):
     return factory
 
 
-async def test_subscribe_records_event(session_factory) -> None:
+async def test_subscribe_records_event(session_factory: Any) -> None:
     async with session_factory() as session:
         uow = UnitOfWork(session)
         service = SubscriptionService(uow)
@@ -45,7 +47,7 @@ async def test_subscribe_records_event(session_factory) -> None:
         assert [e.event for e in history] == ["subscribed"]
 
 
-async def test_unsubscribe_deletes_row_and_records_event(session_factory) -> None:
+async def test_unsubscribe_deletes_row_and_records_event(session_factory: Any) -> None:
     async with session_factory() as session:
         uow = UnitOfWork(session)
         service = SubscriptionService(uow)
@@ -60,7 +62,7 @@ async def test_unsubscribe_deletes_row_and_records_event(session_factory) -> Non
         assert [e.event for e in history] == ["subscribed", "unsubscribed"]
 
 
-async def test_history_visible_after_resubscribe(session_factory) -> None:
+async def test_history_visible_after_resubscribe(session_factory: Any) -> None:
     """Приёмка F6: после подписки → отписки → подписки — одна активная
     подписка и видна история (3 события в хронологическом порядке)."""
     async with session_factory() as session:
@@ -82,7 +84,7 @@ async def test_history_visible_after_resubscribe(session_factory) -> None:
         assert all(e.user_id == 42 for e in history)
 
 
-async def test_total_unsubscribed_counts_events(session_factory) -> None:
+async def test_total_unsubscribed_counts_events(session_factory: Any) -> None:
     async with session_factory() as session:
         uow = UnitOfWork(session)
         service = SubscriptionService(uow)
