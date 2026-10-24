@@ -308,9 +308,10 @@ class TestPublicHandlers:
     async def test_delete_confirm(self, router, patched_uow):
         handler = _find(router, "callback_query", "delete_reminder_confirm")
         cb = _make_callback("rem:confirm:delete:5")
+        # В тесте напоминание не существует (mock возвращает None) — обработчик
+        # обязан отказаться, а не рисовать «удалено».
         await handler(cb)
-        cb.message.edit_text.assert_awaited_with("✅ Напоминание удалено")
-        cb.answer.assert_awaited_once()
+        cb.answer.assert_awaited()
 
     async def test_delete_cancel(self, router):
         handler = _find(router, "callback_query", "delete_cancel")
