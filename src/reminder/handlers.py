@@ -234,7 +234,10 @@ def create_router(bot: Bot | None = None) -> Router:
             return
         async with UnitOfWork() as uow:
             service = ReminderService(uow)
-            await service.cancel_reminder(reminder_id)
+            ok = await service.cancel_reminder(reminder_id, callback.from_user.id)
+        if not ok:
+            await callback.answer("Напоминание не найдено.", show_alert=True)
+            return
         if callback.message:
             await callback.message.edit_text("✅ Напоминание удалено")  # type: ignore[union-attr]
         await callback.answer()

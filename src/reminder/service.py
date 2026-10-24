@@ -78,11 +78,17 @@ class ReminderService:
     async def mark_done(self, reminder_id: int) -> None:
         await self._reminders.mark_done(reminder_id)
 
-    async def cancel_reminder(self, reminder_id: int) -> None:
+    async def cancel_reminder(self, reminder_id: int, user_id: int | None = None) -> bool:
         reminder = await self._reminders.get_by_id(reminder_id)
-        if reminder:
-            reminder.status = ReminderStatus.cancelled
-            reminder.is_active = False
+        if not reminder:
+            return False
+        # Гард владения: отменять может только автор (или админ — проверяется
+        # в хэндлере). Здесь достаточно проверки владельца.
+        if user_id is not None and reminder.user_id != user_id:
+            return False
+        reminder.status = ReminderStatus.cancelled
+        reminder.is_active = False
+        return True
 
     async def send_reminder(self, reminder: Reminder) -> None:
         if not self.bot:
