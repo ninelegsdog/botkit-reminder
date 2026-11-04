@@ -1,4 +1,4 @@
-FROM python@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217 AS builder
+FROM python@sha256:f17ec845ebdd4f3347431579e1c22eaeec82913f039f2a54b937c7ff870bacdb AS builder
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -23,16 +23,16 @@ RUN --mount=type=secret,id=BOTKIT_CORE_TOKEN bash <<'EOF'
     # core is already pinned by tag where it matters; the line removed here is redundant,
     # not lost - and its own dependencies stay constrained, which is what this file is for.
     grep -v '^botkit-core @ ' /tmp/constraints.txt > /tmp/c.txt && mv /tmp/c.txt /tmp/constraints.txt
-    pip install --no-cache-dir -c /tmp/constraints.txt -e ".[dev]"
+    pip install --no-cache-dir --no-deps -c /tmp/constraints.txt -e ".[dev]"
     rm -f ~/.gitconfig /tmp/constraints.txt /usr/local/bin/uv
     apt-get purge -y --auto-remove git
     rm -rf /var/lib/apt/lists/*
 EOF
 
-FROM python@sha256:09f7da3bc104798d0afb40bc08d23ab2da20a76130cec1f2ef170848f5d85217 AS runtime
+FROM python@sha256:f17ec845ebdd4f3347431579e1c22eaeec82913f039f2a54b937c7ff870bacdb AS runtime
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/lib/python* /usr/local/lib/
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
 RUN mkdir -p /app/data /app/backups && chown -R appuser:appgroup /app
