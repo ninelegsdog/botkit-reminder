@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v5.0.0
         with:
           fetch-depth: 0  # latest tag is required by the version drift check
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "3.12"
       - name: Repository contract
@@ -72,7 +72,7 @@ jobs:
         run: python3 scripts/check-coverage.py . scripts/coverage-floors.json coverage.json
       
       # Pre-commit checks
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "3.12"
       - name: Install pre-commit and gitleaks
