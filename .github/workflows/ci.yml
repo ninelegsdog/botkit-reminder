@@ -39,13 +39,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v5.0.0
         with:
           fetch-depth: 0  # latest tag is required by the version drift check
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "3.12"
       - name: Repository contract
         run: python3 scripts/check-repo-contract.py . scripts/repo-contract.json
       - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           version: "0.13.0"
       - name: Lockfile must be current
@@ -72,7 +72,7 @@ jobs:
         run: python3 scripts/check-coverage.py . scripts/coverage-floors.json coverage.json
       
       # Pre-commit checks
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v6.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v6.0.0
         with:
           python-version: "3.12"
       - name: Install pre-commit and gitleaks
@@ -200,7 +200,7 @@ jobs:
           format: "spdx-json"
           output-file: "sbom.spdx.json"
       - name: Publish SBOM to Dependency Graph
-        uses: anchore/sbom-action/publish-sbom@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26  # v0.24.2
+        uses: anchore/sbom-action/publish-sbom@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c  # v0.24.3
         with:
           sbom-artifact-match: "sbom.spdx.json"
 
