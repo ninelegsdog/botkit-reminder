@@ -32,7 +32,7 @@ EOF
 FROM python:3.13-slim AS runtime
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python* /usr/local/lib/
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
 RUN mkdir -p /app/data /app/backups && chown -R appuser:appgroup /app
