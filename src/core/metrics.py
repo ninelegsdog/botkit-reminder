@@ -8,6 +8,7 @@ from typing import Any
 
 from aiohttp import web
 from botkit_core.metrics import (
+    BOTKIT_ERRORS_TOTAL,
     BOTKIT_UPDATES_TOTAL,
 )
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
@@ -38,11 +39,11 @@ BROADCAST_SENT = Counter(
     "Broadcast messages sent",
     ["status"],
 )
-ERROR_HANDLER_ERRORS = Counter(
-    "error_handler_errors_total",
-    "Errors caught by global handler",
-    ["error_type"],
-)
+# Shared botkit_errors_total counter (see botkit_core). Exposed under the canonical
+# name so the monitoring SLO rules (BotErrorSpike / BotErrorBudgetBurn*) can see it.
+ERRORS_TOTAL = BOTKIT_ERRORS_TOTAL
+# Backward-compatible alias for older callers/dashboards.
+ERROR_HANDLER_ERRORS = ERRORS_TOTAL
 WEBHOOK_REQUESTS = Counter(
     "webhook_requests_total",
     "Webhook requests",
@@ -83,7 +84,7 @@ class Metrics:
 
     def inc_errors(self) -> None:
         self.errors += 1
-        ERROR_HANDLER_ERRORS.labels(error_type="domain").inc()
+        ERRORS_TOTAL.labels(error_type="domain").inc()
 
     def uptime_seconds(self) -> float:
         return time.time() - self._start

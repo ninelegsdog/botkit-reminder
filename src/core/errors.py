@@ -9,9 +9,16 @@ from typing import Any
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
 from aiogram.types import ErrorEvent, TelegramObject
 
-from src.core.metrics import ERROR_HANDLER_ERRORS
+from src.core.metrics import ERRORS_TOTAL
 
 logger = logging.getLogger(__name__)
+
+_ERROR_TYPES = ("retry_after", "network", "unhandled", "domain")
+
+
+def init_error_metrics() -> None:
+    for error_type in _ERROR_TYPES:
+        ERRORS_TOTAL.labels(error_type=error_type).inc(0)
 
 
 async def _handle_retry_after(event: TelegramObject, exc: TelegramRetryAfter) -> None:
@@ -25,19 +32,22 @@ async def _handle_retry_after(event: TelegramObject, exc: TelegramRetryAfter) ->
 
 async def default_error_handler(event: TelegramObject, exc: Exception) -> None:
     if isinstance(exc, TelegramRetryAfter):
-        ERROR_HANDLER_ERRORS.labels(error_type="retry_after").inc()
+        ERRORS_TOTAL.labels(error_type="retry_after").inc()
         logger.warning("TelegramRetryAfter: %s", exc)
         await _handle_retry_after(event, exc)
         return
     if isinstance(exc, TelegramNetworkError):
-        ERROR_HANDLER_ERRORS.labels(error_type="network_error").inc()
+        ERRORS_TOTAL.labels(error_type="network").inc()
         logger.warning("TelegramNetworkError: %s", exc)
         return
-    ERROR_HANDLER_ERRORS.labels(error_type="unhandled").inc()
+    ERRORS_TOTAL.labels(error_type="unhandled").inc()
     logger.critical("Unhandled error: %s", exc)
 
 
 def register_error_handler(dp: Any) -> None:
+    # Ensure the error series exist before any error can fire.
+    init_error_metrics()
+
     @dp.error()  # type: ignore[untyped-decorator]
     async def error_handler(event: ErrorEvent) -> None:
         await default_error_handler(event, event.exception)
