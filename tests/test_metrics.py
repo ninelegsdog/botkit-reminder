@@ -6,7 +6,7 @@ from prometheus_client import Counter
 
 from src.core.metrics import (
     BROADCAST_SENT,
-    ERROR_HANDLER_ERRORS,
+    ERRORS_TOTAL,
     REMINDERS_SENT,
     SCHEDULER_ERRORS,
     SCHEDULER_TICKS,
@@ -21,7 +21,7 @@ def test_metrics_defined() -> None:
     assert isinstance(SCHEDULER_ERRORS, Counter)
     assert isinstance(REMINDERS_SENT, Counter)
     assert isinstance(BROADCAST_SENT, Counter)
-    assert isinstance(ERROR_HANDLER_ERRORS, Counter)
+    assert isinstance(ERRORS_TOTAL, Counter)
     assert isinstance(WEBHOOK_REQUESTS, Counter)
 
 
