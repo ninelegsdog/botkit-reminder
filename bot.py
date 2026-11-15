@@ -14,7 +14,6 @@ from src.core.config import settings
 from src.core.errors import register_error_handler
 from src.core.logging import LoggingMiddleware, setup_logging
 from src.core.metrics import health, metrics, start_metrics_server, version
-from src.core.sentry import init_sentry
 from src.core.tgwebhook import build_webhook_app
 from src.core.throttling import ThrottlingMiddleware
 from src.core.tracing import TracingMiddleware, setup_tracing
@@ -105,7 +104,6 @@ async def _run_polling(shutdown_event: asyncio.Event) -> None:
 async def main() -> None:
     setup_logging(level="INFO", json=True, bot_name="reminder")
     setup_tracing(service_name="reminder")
-    init_sentry()
     settings.validate_on_startup()
     logging.basicConfig(level=settings.log_level)
 

@@ -32,9 +32,6 @@ class Settings(BaseSettings):
     telegram_stars_provider_enabled: bool = True
 
     log_level: str = "INFO"
-
-    sentry_dsn: str = ""
-
     @property
     def admin_ids_list(self) -> list[int]:
         result: list[int] = []

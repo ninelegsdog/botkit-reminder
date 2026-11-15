@@ -24,7 +24,6 @@ dependencies = [
     "pydantic-settings>=2.0",
     "apscheduler>=3.10",
     "prometheus-client>=0.20",
-    "sentry-sdk>=2.0",
 ]
 
 [project.optional-dependencies]
